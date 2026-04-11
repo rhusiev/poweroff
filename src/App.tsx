@@ -4,14 +4,22 @@ import type { OTG, City, Street, Accident, SavedAddress } from './api/types';
 import SearchableSelect from './components/SearchableSelect';
 import CumulativeTimeline from './components/CumulativeTimeline';
 import { 
-  Clock, MapPin, Search, Zap, ZapOff,
+  Clock, MapPin, Search, ZapOff,
   Hash, User, CheckCircle2,
   RefreshCcw, LayoutGrid, ListChecks, ArrowRight,
   ExternalLink, Menu, X, Save, Trash2, Plus, Bookmark,
   Home, Moon, Sun, Monitor
-  } from 'lucide-react';
+} from 'lucide-react';
 
-  const App: React.FC = () => {
+const BrandingIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
+  <svg viewBox="65 35 75 130" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g transform="matrix(2.5,0,0,2.5,46.64623,40)">
+      <path d="M 20,0 H 30 L 24,16 H 34 L 22,32 H 32 L 16,48 20,36 H 10 L 18,22 H 8 Z" fill="currentColor" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
+    </g>
+  </svg>
+);
+
+const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'street' | 'account' | 'saved'>('saved');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
@@ -90,6 +98,7 @@ import {
   useEffect(() => {
     localStorage.setItem('saved_addresses', JSON.stringify(savedAddresses));
   }, [savedAddresses]);
+
   useEffect(() => {
     const init = async () => {
       setIsLoading(prev => ({ ...prev, otgs: true }));
@@ -311,18 +320,12 @@ import {
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 to-amber-400 rounded-xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
               <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <Zap className="text-indigo-600 dark:text-indigo-400 w-6 h-6" fill="currentColor" />
+                <BrandingIcon className="text-indigo-600 dark:text-indigo-400 w-6 h-6" />
               </div>
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-black tracking-tighter text-slate-800 dark:text-slate-100 flex items-center gap-1.5 uppercase">
-                PowerOff <span className="text-indigo-600 dark:text-indigo-400">Lviv</span>
-              </h1>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Live Status Tracker</span>
-              </div>
-            </div>
+            <h1 className="text-xl font-black tracking-tighter text-slate-800 dark:text-slate-100 flex items-center gap-1.5 uppercase leading-none">
+              PowerOff <span className="text-indigo-600 dark:text-indigo-400">Lviv</span>
+            </h1>
           </div>
 
           <div className="flex items-center gap-6">
@@ -447,7 +450,7 @@ import {
                         onChange={(val) => setSelectedStreet(Number(val))}
                         disabled={!selectedCity || isLoading.streets}
                         isLoading={isLoading.streets}
-                        icon={<ListChecks className="w-4 h-4" />}
+                        icon={<Search className="w-4 h-4" />}
                       />
 
                       <div className="space-y-1.5">
@@ -586,10 +589,10 @@ import {
           <div className="lg:w-2/3 flex flex-col">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60 shadow-sm">
+                <div className="p-2.5">
                   <ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-xl font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase">Статус мережі</h3>
+                <h3 className="text-xl font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase leading-none">Статус мережі</h3>
               </div>
             </div>
 
@@ -599,9 +602,9 @@ import {
                   <div className="h-full flex flex-col items-center justify-center space-y-4">
                     <div className="relative">
                       <div className="w-16 h-16 border-4 border-indigo-100 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin"></div>
-                      <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-indigo-600 dark:text-indigo-400 animate-pulse" fill="currentColor" />
+                      <BrandingIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-indigo-600 dark:text-indigo-400 animate-pulse" />
                     </div>
-                    <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.2em] text-[10px]">Аналіз мережі...</p>
+                    <p className="text-slate-400 dark:text-slate-50 font-black uppercase tracking-[0.2em] text-[10px]">Аналіз мережі...</p>
                   </div>
                 ) : (selectedStreet && buildingNumber) || (activeTab === 'saved' && selectedStreet && buildingNumber) ? (
                   <CumulativeTimeline 
@@ -694,7 +697,7 @@ import {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-4 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-3">
-              <Zap className="text-indigo-600 dark:text-indigo-400 w-5 h-5" fill="currentColor" />
+              <BrandingIcon className="text-indigo-600 dark:text-indigo-400 w-5 h-5" />
               <span className="text-lg font-black tracking-tighter text-slate-800 dark:text-slate-100 uppercase">PowerOff Lviv</span>
             </div>
             <p className="text-slate-400 dark:text-slate-500 font-bold text-xs max-w-sm leading-relaxed">
