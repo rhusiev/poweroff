@@ -1,8 +1,15 @@
-const CACHE_NAME = 'poweroff-v1';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'poweroff-v4'; 
+
+const ASSETS_TO_CACHE =[
   '/',
   '/index.html',
   '/favicon.svg',
+  '/favicon.ico',
+  '/favicon-96x96.png',
+  '/apple-touch-icon.png',
+  '/web-app-manifest-192x192.png',
+  '/web-app-manifest-512x512.png',
+  '/icon-maskable.svg',
   '/manifest.json'
 ];
 
