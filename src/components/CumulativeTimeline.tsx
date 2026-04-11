@@ -36,8 +36,11 @@ const getStatus = (acc: Accident, isDataOld: boolean): Status => {
 };
 
 const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, lastSync }) => {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+  const now = new Date(); // still need now for currentMinute calculation
 
   const isDataOld = useMemo(() => {
     if (!lastSync) return true;
@@ -119,7 +122,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
       case 'yellow': return 'bg-amber-400';
       case 'green': return 'bg-emerald-500';
       case 'gray': return 'bg-slate-400';
-      default: return 'bg-slate-200';
+      default: return 'bg-slate-200 dark:bg-slate-700';
     }
   };
 
@@ -139,7 +142,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     const totalMin = (endHour - startHour) * 60;
     
     const daySegments = segments.filter(s => s.end > dayStartMin && s.start < dayEndMin);
-    const baseColor = isDataOld ? 'bg-slate-200' : 'bg-emerald-500';
+    const baseColor = isDataOld ? 'bg-slate-200 dark:bg-slate-800' : 'bg-emerald-500';
 
     const markers = [];
     for (let h = startHour; h <= endHour; h += 3) {
@@ -147,7 +150,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     }
 
     return (
-      <div className={`relative h-20 ${baseColor} rounded-3xl overflow-hidden shadow-inner border border-slate-200 group`}>
+      <div className={`relative h-20 ${baseColor} rounded-3xl overflow-hidden shadow-inner border border-slate-200 dark:border-slate-700 group`}>
         {daySegments.map((s, i) => {
           const left = Math.max(0, (s.start - dayStartMin) / totalMin * 100);
           const right = Math.min(100, (s.end - dayStartMin) / totalMin * 100);
@@ -168,7 +171,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
             return (
               <div 
                 key={h} 
-                className={`absolute h-full w-[1.5px] ${h % 3 === 0 ? 'bg-black/40' : 'bg-black/20'}`}
+                className={`absolute h-full w-[1.5px] ${h % 3 === 0 ? 'bg-black/40 dark:bg-white/20' : 'bg-black/20 dark:bg-white/10'}`}
                 style={{ left: `${((h - startHour) / (endHour - startHour)) * 100}%` }}
               />
             );
@@ -177,10 +180,10 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
 
         {day === Math.floor(currentMinute / 1440) && (currentMinute % 1440) >= startHour * 60 && (currentMinute % 1440) < endHour * 60 && (
           <div 
-            className="absolute top-0 bottom-0 w-1.5 bg-white shadow-[0_0_15px_rgba(255,255,255,1)] z-10"
+            className="absolute top-0 bottom-0 w-1.5 bg-white dark:bg-indigo-400 shadow-[0_0_15px_rgba(255,255,255,1)] dark:shadow-[0_0_15px_rgba(129,140,248,0.8)] z-10"
             style={{ left: `${((currentMinute % 1440) - startHour * 60) / totalMin * 100}%` }}
           >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg border-2 border-slate-100"></div>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white dark:bg-indigo-400 rounded-full shadow-lg border-2 border-slate-100 dark:border-slate-800"></div>
           </div>
         )}
 
@@ -194,7 +197,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
                 className={`absolute bottom-2 flex flex-col items-center ${pos < 5 ? 'left-2' : pos > 95 ? 'right-2' : ''}`}
                 style={pos >= 5 && pos <= 95 ? { left: `${pos}%`, transform: 'translateX(-50%)' } : {}}
               >
-                <span className={`text-[11px] font-black tracking-tight ${isDataOld ? 'text-slate-800' : 'text-white'} drop-shadow-md`}>
+                <span className={`text-[11px] font-black tracking-tight ${isDataOld ? 'text-slate-800 dark:text-slate-200' : 'text-white'} drop-shadow-md`}>
                   {hourLabel}
                 </span>
               </div>
@@ -208,17 +211,17 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {isDataOld && (
-        <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center gap-3">
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-4 rounded-2xl flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
-          <p className="text-xs font-bold text-amber-800 uppercase tracking-widest leading-tight">Дані застаріли (останнє оновлення більше 48г. тому)</p>
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-widest leading-tight">Дані застаріли (останнє оновлення більше 48г. тому)</p>
         </div>
       )}
       <div className={`p-8 rounded-[2.5rem] border-4 transition-all duration-500 ${
-        currentStatus === 'purple' ? 'bg-fuchsia-50 border-fuchsia-100' :
-        currentStatus === 'red' ? 'bg-rose-50 border-rose-100' :
-        currentStatus === 'yellow' ? 'bg-amber-50 border-amber-100' :
-        currentStatus === 'gray' ? 'bg-slate-50 border-slate-100' :
-        'bg-emerald-50 border-emerald-100'
+        currentStatus === 'purple' ? 'bg-fuchsia-50 dark:bg-fuchsia-950/20 border-fuchsia-100 dark:border-fuchsia-900/50' :
+        currentStatus === 'red' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/50' :
+        currentStatus === 'yellow' ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/50' :
+        currentStatus === 'gray' ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800' :
+        'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50'
       }`}>
         <div className="flex flex-col md:flex-row items-center gap-8">
           <div className={`p-6 rounded-full shadow-2xl transition-transform hover:scale-105 duration-500 ${getStatusColor(currentStatus)}`}>
@@ -230,15 +233,15 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           
           <div className="text-center md:text-left space-y-2">
             <h3 className={`text-4xl md:text-5xl font-black tracking-tighter uppercase ${
-              currentStatus === 'purple' ? 'text-fuchsia-900' :
-              currentStatus === 'red' ? 'text-rose-900' :
-              currentStatus === 'yellow' ? 'text-amber-900' :
-              currentStatus === 'gray' ? 'text-slate-900' :
-              'text-emerald-900'
+              currentStatus === 'purple' ? 'text-fuchsia-900 dark:text-fuchsia-300' :
+              currentStatus === 'red' ? 'text-rose-900 dark:text-rose-300' :
+              currentStatus === 'yellow' ? 'text-amber-900 dark:text-amber-300' :
+              currentStatus === 'gray' ? 'text-slate-900 dark:text-slate-300' :
+              'text-emerald-900 dark:text-emerald-300'
             }`}>
               {getStatusLabel(currentStatus)}
             </h3>
-            <p className="font-bold text-sm uppercase tracking-widest text-slate-500">
+            <p className="font-bold text-sm uppercase tracking-widest text-slate-500 dark:text-slate-400">
               {buildingNumber ? `вул. ${accidents[0]?.street.name}, буд. ${buildingNumber}` : 'Оберіть номер будинку'}
             </p>
           </div>
@@ -247,32 +250,32 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4 px-2">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
             <Clock className="w-3.5 h-3.5" /> Графік на 48 годин
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
              <div className="flex items-center gap-2">
                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-               <span className="text-[11px] font-black uppercase text-slate-600">Є світло</span>
+               <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400">Є світло</span>
              </div>
              <div className="flex items-center gap-2">
                <div className="w-3 h-3 rounded-full bg-fuchsia-600"></div>
-               <span className="text-[11px] font-black uppercase text-slate-600">Аварійне</span>
+               <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400">Аварійне</span>
              </div>
              <div className="flex items-center gap-2">
                <div className="w-3 h-3 rounded-full bg-rose-600"></div>
-               <span className="text-[11px] font-black uppercase text-slate-600">Планове</span>
+               <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400">Планове</span>
              </div>
              <div className="flex items-center gap-2">
                <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-               <span className="text-[11px] font-black uppercase text-slate-600">Можливе</span>
+               <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400">Можливе</span>
              </div>
           </div>
         </div>
 
-        <div className="space-y-12 bg-white p-6 md:p-12 rounded-[2.5rem] md:rounded-[3rem] border border-slate-200/60 shadow-sm">
+        <div className="space-y-12 bg-white dark:bg-slate-900 p-6 md:p-12 rounded-[2.5rem] md:rounded-[3rem] border border-slate-200/60 dark:border-slate-800/60 shadow-sm">
           <div className="space-y-4">
-            <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 ml-1">Сьогодні</p>
+            <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500 ml-1">Сьогодні</p>
             <div className="hidden md:block">
               {renderTimeline(0, 0, 24)}
             </div>
@@ -283,7 +286,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           </div>
           
           <div className="space-y-4">
-            <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 ml-1">Завтра</p>
+            <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500 ml-1">Завтра</p>
             <div className="hidden md:block">
               {renderTimeline(1, 0, 24)}
             </div>

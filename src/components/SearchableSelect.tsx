@@ -51,30 +51,30 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   return (
     <div className="space-y-1.5" ref={dropdownRef}>
-      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500/80 ml-1">{label}</label>
+      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500/80 dark:text-slate-400/80 ml-1">{label}</label>
       <div className="relative">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10">
           {icon}
         </div>
         <div
-          className={`w-full bg-slate-50/80 border border-slate-200 rounded-2xl pl-11 pr-10 py-4 transition-all cursor-pointer font-bold text-slate-700 flex items-center justify-between min-h-[56px] ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-slate-300 hover:bg-slate-100/50'}`}
+          className={`w-full bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl pl-11 pr-10 py-4 transition-all cursor-pointer font-bold text-slate-700 dark:text-slate-200 flex items-center justify-between min-h-[56px] ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100/50 dark:hover:bg-slate-800'}`}
           onClick={() => !disabled && setIsOpen(!isOpen)}
         >
-          <span className={`truncate mr-2 ${displayValue ? 'text-slate-800' : 'text-slate-400'}`}>
+          <span className={`truncate mr-2 ${displayValue ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
             {isLoading ? 'Завантаження...' : (displayValue || placeholder)}
           </span>
-          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
 
         {isOpen && !disabled && (
-          <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-3 border-b border-slate-100 flex items-center gap-2">
+          <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="p-3 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
               <Search className="w-4 h-4 text-slate-400" />
               <input
                 autoFocus
                 type="text"
                 placeholder="Пошук..."
-                className="w-full bg-transparent border-0 focus:ring-0 text-sm font-bold text-slate-700 p-0"
+                className="w-full bg-transparent border-0 focus:ring-0 text-sm font-bold text-slate-700 dark:text-slate-200 p-0"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -84,13 +84,13 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 </button>
               )}
             </div>
-            <div className="max-h-60 overflow-y-auto">
+            <div className="max-h-60 overflow-y-auto custom-scrollbar">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => (
                   <button
                     key={option.id}
                     type="button"
-                    className={`w-full text-left px-5 py-3 text-sm font-bold transition-colors hover:bg-slate-50 ${option.id === value ? 'text-indigo-600 bg-indigo-50/30' : 'text-slate-600'}`}
+                    className={`w-full text-left px-5 py-3 text-sm font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 ${option.id === value ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-900/20' : 'text-slate-600 dark:text-slate-400'}`}
                     onClick={() => {
                       onChange(option.id);
                       setIsOpen(false);
