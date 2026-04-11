@@ -25,13 +25,11 @@ const parseAPIDate = (dateStr: string) => {
 const getStatus = (acc: Accident, isDataOld: boolean): Status => {
   if (isDataOld) return 'gray';
   
-  // 1. Check switchSubReason first
   if (acc.switchSubReason === 1 || acc.switchSubReason === 3) return 'purple';
   if (acc.switchSubReason === 2) return 'red';
   
-  // 2. Fallback to typeOff
   if (acc.typeOff === 1) return 'purple';
-  if (acc.typeOff === 0 || acc.typeOff === 2) return 'red'; // Operational Switching (2) is now "Планове"
+  if (acc.typeOff === 0 || acc.typeOff === 2) return 'red';
   if (acc.typeOff === 30) return 'yellow';
   
   return 'gray';
@@ -150,7 +148,6 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
 
     return (
       <div className={`relative h-20 ${baseColor} rounded-3xl overflow-hidden shadow-inner border border-slate-200 group`}>
-        {/* Render status segments */}
         {daySegments.map((s, i) => {
           const left = Math.max(0, (s.start - dayStartMin) / totalMin * 100);
           const right = Math.min(100, (s.end - dayStartMin) / totalMin * 100);
@@ -165,7 +162,6 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           );
         })}
 
-        {/* Hourly vertical lines */}
         <div className="absolute inset-0 flex pointer-events-none">
           {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
             const h = startHour + i;
@@ -179,7 +175,6 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           })}
         </div>
 
-        {/* Current time indicator */}
         {day === Math.floor(currentMinute / 1440) && (currentMinute % 1440) >= startHour * 60 && (currentMinute % 1440) < endHour * 60 && (
           <div 
             className="absolute top-0 bottom-0 w-1.5 bg-white shadow-[0_0_15px_rgba(255,255,255,1)] z-10"
@@ -189,7 +184,6 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           </div>
         )}
 
-        {/* Time markers every 3 hours */}
         <div className="absolute inset-0 flex pointer-events-none px-1">
           {markers.map(h => {
             const pos = ((h - startHour) / (endHour - startHour)) * 100;
@@ -277,28 +271,22 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
         </div>
 
         <div className="space-y-12 bg-white p-6 md:p-12 rounded-[2.5rem] md:rounded-[3rem] border border-slate-200/60 shadow-sm">
-          {/* Today */}
           <div className="space-y-4">
             <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 ml-1">Сьогодні</p>
-            {/* Desktop View: 24h bar */}
             <div className="hidden md:block">
               {renderTimeline(0, 0, 24)}
             </div>
-            {/* Mobile View: Split 12h bars */}
             <div className="md:hidden space-y-4">
               {renderTimeline(0, 0, 12)}
               {renderTimeline(0, 12, 24)}
             </div>
           </div>
           
-          {/* Tomorrow */}
           <div className="space-y-4">
             <p className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-400 ml-1">Завтра</p>
-            {/* Desktop View: 24h bar */}
             <div className="hidden md:block">
               {renderTimeline(1, 0, 24)}
             </div>
-            {/* Mobile View: Split 12h bars */}
             <div className="md:hidden space-y-4">
               {renderTimeline(1, 0, 12)}
               {renderTimeline(1, 12, 24)}

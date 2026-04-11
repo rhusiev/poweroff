@@ -29,9 +29,8 @@ async function fetchFromAPI<T>(endpoint: string, params: Record<string, string |
   return data;
 }
 
-// Helper to extract member array from Hydra response
 function getMembers<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data; // Some APIs return array directly
+  if (Array.isArray(data)) return data;
   if (data && typeof data === 'object' && 'hydra:member' in data) {
     return (data as { 'hydra:member': T[] })['hydra:member'];
   }
@@ -82,7 +81,6 @@ export const apiClient = {
         option_key: 'successful_last_synk',
       });
       const members = getMembers<SyncStatus>(data);
-      // Priority: n.date, then n.option_value
       return members[0]?.date || members[0]?.option_value || null;
     } catch (e) {
       console.warn('[API Client] Failed to get sync time', e);

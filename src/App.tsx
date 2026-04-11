@@ -15,7 +15,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'street' | 'account' | 'saved'>('street');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Street search state
   const [otgs, setOtgs] = useState<OTG[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [streets, setStreets] = useState<Street[]>([]);
@@ -27,14 +26,12 @@ const App: React.FC = () => {
   const [selectedStreet, setSelectedStreet] = useState<number | ''>('');
   const [buildingNumber, setBuildingNumber] = useState('');
 
-  // Saved addresses state
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(() => {
     const saved = localStorage.getItem('saved_addresses');
     return saved ? JSON.parse(saved) : [];
   });
   const [customName, setCustomName] = useState('');
 
-  // Account check state
   const [accountNumber, setAccountNumber] = useState('');
   const [accountStatus, setAccountStatus] = useState<{
     light: boolean;
@@ -53,12 +50,10 @@ const App: React.FC = () => {
 
   const isAutoLoading = useRef(false);
 
-  // Persist saved addresses
   useEffect(() => {
     localStorage.setItem('saved_addresses', JSON.stringify(savedAddresses));
   }, [savedAddresses]);
 
-  // Initial load
   useEffect(() => {
     const init = async () => {
       setIsLoading(prev => ({ ...prev, otgs: true }));
@@ -78,7 +73,6 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Fetch cities when OTG changes
   useEffect(() => {
     if (selectedOtg) {
       const fetchCities = async () => {
@@ -105,7 +99,6 @@ const App: React.FC = () => {
     }
   }, [selectedOtg]);
 
-  // Fetch streets when City changes
   useEffect(() => {
     if (selectedCity) {
       const fetchStreets = async () => {
@@ -130,7 +123,6 @@ const App: React.FC = () => {
     }
   }, [selectedCity]);
 
-  // Fetch accidents when Street changes
   useEffect(() => {
     if (selectedCity && selectedStreet) {
       const fetchAccidents = async () => {
@@ -199,7 +191,6 @@ const App: React.FC = () => {
     isAutoLoading.current = true;
     setActiveTab('street');
     
-    // Set all selections immediately
     setSelectedOtg(addr.otgId);
     setSelectedCity(addr.cityId);
     setSelectedStreet(addr.streetId);
@@ -207,11 +198,9 @@ const App: React.FC = () => {
 
     try {
       setIsLoading(prev => ({ ...prev, accidents: true }));
-      // Fetch accidents directly
       const data = await apiClient.getAccidents(addr.cityId, addr.streetId);
       setAccidents(data);
       
-      // Load dependencies for dropdowns
       const [citiesData, streetsData] = await Promise.all([
         apiClient.getCities(addr.otgId),
         apiClient.getStreets(addr.cityId)
@@ -223,7 +212,6 @@ const App: React.FC = () => {
       console.error('Failed to load saved address details:', error);
     } finally {
       setIsLoading(prev => ({ ...prev, accidents: false }));
-      // Allow effects to process before clearing flag
       setTimeout(() => {
         isAutoLoading.current = false;
       }, 100);
@@ -241,7 +229,6 @@ const App: React.FC = () => {
     for (const part of parts) {
       if (part === targetClean || normalize(part) === targetNormalized) return true;
       
-      // Handle numeric ranges like "1-5"
       if (/^\d+-\d+$/.test(part)) {
         const [startStr, endStr] = part.split('-');
         const start = parseInt(startStr);
@@ -265,7 +252,6 @@ const App: React.FC = () => {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '---';
     try {
-      // Strip timezone offset if present to treat as local time
       const localStr = dateStr.replace(/Z|[+-]\d{2}:\d{2}$/, '');
       const date = new Date(localStr);
       return new Intl.DateTimeFormat('uk-UA', {
@@ -368,7 +354,6 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
-          {/* Left Column: Controls */}
           <div className="lg:w-1/3 space-y-8">
             <div className="space-y-2">
               <h2 className="text-3xl font-black tracking-tight text-slate-800 leading-none">
@@ -533,7 +518,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Results */}
           <div className="lg:w-2/3 flex flex-col">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">

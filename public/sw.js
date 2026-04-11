@@ -30,13 +30,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Always go to network for API calls
   if (event.request.url.includes('/api-proxy')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Stale-while-revalidate for assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
