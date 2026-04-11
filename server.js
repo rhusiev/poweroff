@@ -26,7 +26,8 @@ app.use('/api-proxy', createProxyMiddleware({
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Support client-side routing (SPAs)
-app.get('*', (req, res) => {
+// Use a middleware instead of a path pattern to avoid Express 5 / path-to-regexp issues
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
