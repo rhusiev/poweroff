@@ -2,6 +2,7 @@ services:
   poweroff:
     build: .
     container_name: poweroff_app
+    image: ghcr.io/rhusiev/poweroff:${VERSION:-latest}
     restart: unless-stopped
     environment:
       - PORT=3000
