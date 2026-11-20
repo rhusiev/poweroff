@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
-import type { Accident } from '../api/types';
+import type { Accident, GpvWindow } from '../api/types';
 import { CheckCircle2, Clock, ZapOff, AlertTriangle } from 'lucide-react';
 
 interface CumulativeTimelineProps {
   accidents: Accident[];
   buildingNumber: string;
   streetName: string;
+  group: string | null;
+  gpvWindows: GpvWindow[];
   lastSync: string | null;
 }
 
@@ -36,7 +38,16 @@ const getStatus = (acc: Accident, isDataOld: boolean): Status => {
   return 'gray';
 };
 
-const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, streetName, lastSync }) => {
+const timeToMinutes = (value: string) => {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 24 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, streetName, group, gpvWindows, lastSync }) => {
   const todayStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -63,6 +74,13 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
 
       if (startMin >= endMin) return;
       rawRanges.push({ start: startMin, end: endMin, status });
+    });
+
+    gpvWindows.forEach(window => {
+      const start = timeToMinutes(window.from);
+      const end = timeToMinutes(window.to);
+      if (start === null || end === null || start >= end) return;
+      rawRanges.push({ start, end, status: 'red' });
     });
 
     rawRanges.sort((a, b) => a.start - b.start || a.end - b.end);
@@ -106,7 +124,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     }
 
     return merged;
-  }, [accidents, isDataOld, todayStart]);
+  }, [accidents, gpvWindows, isDataOld, todayStart]);
 
   const currentMinute = Math.floor((now.getTime() - todayStart.getTime()) / (60 * 1000));
   
@@ -251,6 +269,11 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
             <p className="font-bold text-sm uppercase tracking-widest text-slate-500 dark:text-slate-400">
               {addressLine}
             </p>
+            {group && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-900/50">
+                Черга ГПВ {group}
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { apiClient } from './api/client';
-import type { OTG, City, Street, Accident, SavedAddress } from './api/types';
+import type { OTG, City, Street, Accident, SavedAddress, GpvSchedule, GpvWindow } from './api/types';
 import SearchableSelect from './components/SearchableSelect';
 import CumulativeTimeline from './components/CumulativeTimeline';
 import { 
@@ -10,6 +10,12 @@ import {
   ExternalLink, Menu, X, Save, Trash2, Plus, Bookmark,
   Home, Moon, Sun, Monitor
 } from 'lucide-react';
+
+const formatDayKey = (date = new Date()) => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}.${month}.${date.getFullYear()}`;
+};
 
 const BrandingIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
   <svg viewBox="65 35 75 130" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -65,6 +71,8 @@ const App: React.FC = () => {
   const [streets, setStreets] = useState<Street[]>([]);
   const [accidents, setAccidents] = useState<Accident[]>([]);
   const [plannedAccidents, setPlannedAccidents] = useState<Accident[]>([]);
+  const [buildingGroup, setBuildingGroup] = useState<string | null>(null);
+  const [gpvSchedule, setGpvSchedule] = useState<GpvSchedule | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   const [selectedOtg, setSelectedOtg] = useState<number | ''>('');
@@ -195,6 +203,43 @@ const App: React.FC = () => {
     }
   }, [selectedCity, selectedStreet]);
 
+  useEffect(() => {
+    if (!selectedCity || !selectedStreet || !buildingNumber.trim()) {
+      setBuildingGroup(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const group = await apiClient.getBuildingGroup(selectedCity, selectedStreet, buildingNumber);
+        if (!cancelled) setBuildingGroup(group);
+      } catch (error) {
+        console.error('Failed to resolve outage group:', error);
+        if (!cancelled) setBuildingGroup(null);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [selectedCity, selectedStreet, buildingNumber]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const data = await apiClient.getGpvSchedule();
+      if (!cancelled) setGpvSchedule(data);
+    };
+    load();
+    const timer = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   const handleCheckAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (accountNumber.length !== 10) return;
@@ -307,6 +352,18 @@ const App: React.FC = () => {
     if (fromList) return fromList;
     return savedAddresses.find(a => a.streetId === selectedStreet && a.cityId === selectedCity)?.streetName ?? '';
   }, [streets, selectedStreet, selectedCity, savedAddresses]);
+
+  const [todayKey, setTodayKey] = useState(formatDayKey);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTodayKey(formatDayKey()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const gpvWindows = useMemo<GpvWindow[]>(() => {
+    if (!buildingGroup || !gpvSchedule || gpvSchedule.date !== todayKey) return [];
+    return gpvSchedule.groups[buildingGroup] ?? [];
+  }, [buildingGroup, gpvSchedule, todayKey]);
 
   const allOutages = useMemo(
     () => [...accidents, ...plannedAccidents],
@@ -632,9 +689,12 @@ const App: React.FC = () => {
                   </div>
                 ) : (selectedStreet && buildingNumber) || (activeTab === 'saved' && selectedStreet && buildingNumber) ? (
                   <CumulativeTimeline 
+                    key={todayKey}
                     accidents={filteredAccidents} 
                     buildingNumber={buildingNumber} 
                     streetName={selectedStreetName}
+                    group={buildingGroup}
+                    gpvWindows={gpvWindows}
                     lastSync={lastSync} 
                   />
                 ) : selectedStreet ? (

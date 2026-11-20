@@ -47,6 +47,29 @@ export interface Accident {
   };
 }
 
+export interface PwAccount {
+  id: number;
+  city: string;
+  buildingName: string | null;
+  chergGpv: string | null;
+  chergGav: string | null;
+  chergAchr: string | null;
+  chergGvsp: string | null;
+  chergSgav: string | null;
+}
+
+export interface GpvWindow {
+  from: string;
+  to: string;
+}
+
+export interface GpvSchedule {
+  date: string | null;
+  updated: string | null;
+  groups: Record<string, GpvWindow[]>;
+  stale: boolean;
+}
+
 export interface SyncStatus {
   option_key: string;
   option_value: string;
