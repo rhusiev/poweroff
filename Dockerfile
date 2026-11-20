@@ -17,6 +17,7 @@ RUN npm install --production
 # Copy the built application and the server script
 COPY --from=builder /app/dist ./dist
 COPY server.js ./
+COPY server ./server
 
 # Set environment variables
 ENV NODE_ENV=production
