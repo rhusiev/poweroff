@@ -16,8 +16,10 @@ type Status = 'purple' | 'red' | 'yellow' | 'green' | 'gray';
 interface TimeSegment {
   start: number; // minutes from start of local today
   end: number;
-  status: Status;
+  statuses: Status[]; // most severe first, one slice per status
 }
+
+const STATUS_ORDER: Status[] = ['purple', 'red', 'yellow'];
 
 // Helper to treat API's "UTC" dates as Local time values
 const parseAPIDate = (dateStr: string) => {
@@ -61,69 +63,61 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     return syncDate < threshold;
   }, [lastSync, todayStart]);
 
-  const segments = useMemo(() => {
-    const rawRanges: { start: number; end: number; status: Status }[] = [];
+  const segments = useMemo<TimeSegment[]>(() => {
+    if (isDataOld) return [];
+
+    const layers: Record<Status, Uint8Array> = {
+      purple: new Uint8Array(2880),
+      red: new Uint8Array(2880),
+      yellow: new Uint8Array(2880),
+      green: new Uint8Array(2880),
+      gray: new Uint8Array(2880),
+    };
+
+    const addRange = (startMin: number, endMin: number, status: Status) => {
+      if (status === 'green' || status === 'gray') return;
+      for (let m = Math.max(0, startMin); m < Math.min(2880, endMin); m++) {
+        layers[status][m] = 1;
+      }
+    };
 
     accidents.forEach(acc => {
       const start = parseAPIDate(acc.dateEvent);
       const end = parseAPIDate(acc.datePlanIn);
-      const status = getStatus(acc, isDataOld);
 
       const startMin = Math.max(0, Math.floor((start.getTime() - todayStart.getTime()) / (60 * 1000)));
       const endMin = Math.min(2880, Math.ceil((end.getTime() - todayStart.getTime()) / (60 * 1000)));
 
       if (startMin >= endMin) return;
-      rawRanges.push({ start: startMin, end: endMin, status });
+      addRange(startMin, endMin, getStatus(acc, isDataOld));
     });
 
     gpvWindows.forEach(window => {
       const start = timeToMinutes(window.from);
       const end = timeToMinutes(window.to);
       if (start === null || end === null || start >= end) return;
-      rawRanges.push({ start, end, status: 'red' });
+      addRange(start, end, 'red');
     });
 
-    rawRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+    const result: TimeSegment[] = [];
+    let currentKey = '';
+    let currentStatuses: Status[] = [];
+    let currentStart = 0;
 
-    const merged: TimeSegment[] = [];
-    if (rawRanges.length === 0) return [];
+    for (let m = 0; m <= 2880; m++) {
+      const key = m < 2880 ? STATUS_ORDER.filter(status => layers[status][m]).join(',') : '';
 
-    const statusPriority: Record<Status, number> = {
-      purple: 3,
-      red: 2,
-      yellow: 1,
-      green: 0,
-      gray: -1
-    };
-
-    const minutes = new Array(2880).fill(isDataOld ? 'gray' : 'green');
-    
-    rawRanges.forEach(range => {
-      for (let m = range.start; m < range.end; m++) {
-        if (m >= 0 && m < 2880) {
-          const currentPrio = statusPriority[minutes[m] as Status];
-          const newPrio = statusPriority[range.status];
-          if (newPrio > currentPrio) {
-            minutes[m] = range.status;
-          }
+      if (key !== currentKey) {
+        if (currentStatuses.length && m > currentStart) {
+          result.push({ start: currentStart, end: m, statuses: currentStatuses });
         }
+        currentKey = key;
+        currentStatuses = key ? key.split(',') as Status[] : [];
+        currentStart = m;
       }
-    });
-
-    let start = 0;
-    while (start < 2880) {
-      const status = minutes[start];
-      let end = start + 1;
-      while (end < 2880 && minutes[end] === status) {
-        end++;
-      }
-      if (status !== 'green' || isDataOld) {
-        merged.push({ start, end, status: status as Status });
-      }
-      start = end;
     }
 
-    return merged;
+    return result;
   }, [accidents, gpvWindows, isDataOld, todayStart]);
 
   const currentMinute = Math.floor((now.getTime() - todayStart.getTime()) / (60 * 1000));
@@ -131,7 +125,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
   const currentStatus: Status = useMemo(() => {
     if (isDataOld) return 'gray';
     const activeSegment = segments.find(s => currentMinute >= s.start && currentMinute < s.end);
-    return activeSegment ? activeSegment.status : 'green';
+    return activeSegment ? activeSegment.statuses[0] : 'green';
   }, [segments, currentMinute, isDataOld]);
 
   const addressLine = buildingNumber
@@ -180,13 +174,22 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
           const left = Math.max(0, (s.start - dayStartMin) / totalMin * 100);
           const right = Math.min(100, (s.end - dayStartMin) / totalMin * 100);
           const width = right - left;
-          
+          const sliceHeight = 100 / s.statuses.length;
+
           return (
-            <div 
+            <div
               key={i}
-              className={`absolute h-full transition-all duration-500 ${getStatusColor(s.status)}`}
+              className="absolute top-0 bottom-0"
               style={{ left: `${left}%`, width: `${width}%` }}
-            />
+            >
+              {s.statuses.map((status, index) => (
+                <div
+                  key={status}
+                  className={`absolute left-0 right-0 transition-all duration-500 ${getStatusColor(status)}`}
+                  style={{ top: `${index * sliceHeight}%`, height: `${sliceHeight}%` }}
+                />
+              ))}
+            </div>
           );
         })}
 
