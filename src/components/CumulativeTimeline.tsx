@@ -7,7 +7,8 @@ interface CumulativeTimelineProps {
   buildingNumber: string;
   streetName: string;
   group: string | null;
-  gpvWindows: GpvWindow[];
+  gpvWindowsToday: GpvWindow[];
+  gpvWindowsTomorrow: GpvWindow[];
   lastSync: string | null;
 }
 
@@ -49,7 +50,7 @@ const timeToMinutes = (value: string) => {
   return hours * 60 + minutes;
 };
 
-const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, streetName, group, gpvWindows, lastSync }) => {
+const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, streetName, group, gpvWindowsToday, gpvWindowsTomorrow, lastSync }) => {
   const todayStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -92,12 +93,17 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
       addRange(startMin, endMin, getStatus(acc, isDataOld));
     });
 
-    gpvWindows.forEach(window => {
-      const start = timeToMinutes(window.from);
-      const end = timeToMinutes(window.to);
-      if (start === null || end === null || start >= end) return;
-      addRange(start, end, 'red');
-    });
+    const addGpvWindows = (windows: GpvWindow[], dayOffset: number) => {
+      windows.forEach(window => {
+        const start = timeToMinutes(window.from);
+        const end = timeToMinutes(window.to);
+        if (start === null || end === null || start >= end) return;
+        addRange(dayOffset + start, dayOffset + end, 'red');
+      });
+    };
+
+    addGpvWindows(gpvWindowsToday, 0);
+    addGpvWindows(gpvWindowsTomorrow, 1440);
 
     const result: TimeSegment[] = [];
     let currentKey = '';
@@ -118,7 +124,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     }
 
     return result;
-  }, [accidents, gpvWindows, isDataOld, todayStart]);
+  }, [accidents, gpvWindowsToday, gpvWindowsTomorrow, isDataOld, todayStart]);
 
   const currentMinute = Math.floor((now.getTime() - todayStart.getTime()) / (60 * 1000));
   

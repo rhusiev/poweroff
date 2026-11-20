@@ -63,10 +63,17 @@ export interface GpvWindow {
   to: string;
 }
 
-export interface GpvSchedule {
+/** One day of the hourly outage schedule. */
+export interface GpvDay {
   date: string | null;
   updated: string | null;
   groups: Record<string, GpvWindow[]>;
+}
+
+export interface GpvSchedule {
+  today: GpvDay;
+  /** The official page may not publish the next day yet. */
+  tomorrow: GpvDay | null;
   stale: boolean;
 }
 

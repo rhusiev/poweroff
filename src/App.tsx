@@ -360,10 +360,20 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const gpvWindows = useMemo<GpvWindow[]>(() => {
-    if (!buildingGroup || !gpvSchedule || gpvSchedule.date !== todayKey) return [];
-    return gpvSchedule.groups[buildingGroup] ?? [];
+  const tomorrowKey = useMemo(() => {
+    const [day, month, year] = todayKey.split('.').map(Number);
+    return formatDayKey(new Date(year, month - 1, day + 1));
+  }, [todayKey]);
+
+  const gpvWindowsToday = useMemo<GpvWindow[]>(() => {
+    if (!buildingGroup || !gpvSchedule?.today || gpvSchedule.today.date !== todayKey) return [];
+    return gpvSchedule.today.groups[buildingGroup] ?? [];
   }, [buildingGroup, gpvSchedule, todayKey]);
+
+  const gpvWindowsTomorrow = useMemo<GpvWindow[]>(() => {
+    if (!buildingGroup || !gpvSchedule?.tomorrow || gpvSchedule.tomorrow.date !== tomorrowKey) return [];
+    return gpvSchedule.tomorrow.groups[buildingGroup] ?? [];
+  }, [buildingGroup, gpvSchedule, tomorrowKey]);
 
   const allOutages = useMemo(
     () => [...accidents, ...plannedAccidents],
@@ -694,7 +704,8 @@ const App: React.FC = () => {
                     buildingNumber={buildingNumber} 
                     streetName={selectedStreetName}
                     group={buildingGroup}
-                    gpvWindows={gpvWindows}
+                    gpvWindowsToday={gpvWindowsToday}
+                    gpvWindowsTomorrow={gpvWindowsTomorrow}
                     lastSync={lastSync} 
                   />
                 ) : selectedStreet ? (

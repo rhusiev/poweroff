@@ -16,8 +16,12 @@ let cached = null;
 /** @type {Promise<import('../src/api/types').GpvSchedule> | null} */
 let pending = null;
 
+function emptyDay() {
+  return { date: null, updated: null, groups: {} };
+}
+
 function emptySchedule() {
-  return { date: null, updated: null, groups: {}, stale: false };
+  return { today: emptyDay(), tomorrow: null, stale: false };
 }
 
 function decodeEntities(text) {
@@ -42,20 +46,20 @@ function normalizeTime(value) {
 
 /**
  * @param {string} rawHtml
- * @returns {import('../src/api/types').GpvSchedule}
+ * @returns {import('../src/api/types').GpvDay}
  */
 export function parseGpvHtml(rawHtml) {
-  const schedule = emptySchedule();
-  if (!rawHtml) return schedule;
+  const day = emptyDay();
+  if (!rawHtml) return day;
 
   const lines = htmlToLines(rawHtml);
 
   for (const line of lines) {
     const dateMatch = line.match(/Графік погодинних відключень на\s+(\d{2}\.\d{2}\.\d{4})/);
-    if (dateMatch) schedule.date = dateMatch[1];
+    if (dateMatch) day.date = dateMatch[1];
 
     const updatedMatch = line.match(/Інформація станом на\s+(\d{2}:\d{2}\s+\d{2}\.\d{2}\.\d{4})/);
-    if (updatedMatch) schedule.updated = updatedMatch[1];
+    if (updatedMatch) day.updated = updatedMatch[1];
 
     const groupMatch = line.match(/Група\s+(\d\.\d)\s*\.\s*(.*)$/);
     if (!groupMatch) continue;
@@ -67,13 +71,13 @@ export function parseGpvHtml(rawHtml) {
     while ((windowMatch = windowPattern.exec(rest)) !== null) {
       windows.push({ from: normalizeTime(windowMatch[1]), to: normalizeTime(windowMatch[2]) });
     }
-    if (windows.length) schedule.groups[group] = windows;
+    if (windows.length) day.groups[group] = windows;
   }
 
-  return schedule;
+  return day;
 }
 
-async function fetchTodaySchedule() {
+async function fetchSchedules() {
   const response = await fetch(CMS_MENU_URL, {
     headers: { Accept: 'application/ld+json' },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -84,11 +88,16 @@ async function fetchTodaySchedule() {
   const menus = Array.isArray(payload) ? payload : payload['hydra:member'] ?? [];
   const menu = menus.find(item => item.type === 'photo-grafic') ?? menus[0];
   const items = menu?.menuItems ?? [];
-  const today = items.find(item => item.name?.trim().toLowerCase() === 'today') ?? items[0];
+  const byName = name => items.find(item => item.name?.trim().toLowerCase() === name);
+  const today = byName('today') ?? items[0];
+  const tomorrow = byName('tomorrow');
 
   if (!today?.rawHtml) throw new Error('CMS schedule text is empty');
 
-  return parseGpvHtml(today.rawHtml);
+  return {
+    today: parseGpvHtml(today.rawHtml),
+    tomorrow: tomorrow?.rawHtml ? parseGpvHtml(tomorrow.rawHtml) : null,
+  };
 }
 
 /** @returns {Promise<import('../src/api/types').GpvSchedule>} */
@@ -96,8 +105,9 @@ export async function getGpvSchedule() {
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
   if (pending) return pending;
 
-  pending = fetchTodaySchedule()
-    .then(data => {
+  pending = fetchSchedules()
+    .then(days => {
+      const data = { ...days, stale: false };
       cached = { data, at: Date.now() };
       return data;
     })
