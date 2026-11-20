@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [cities, setCities] = useState<City[]>([]);
   const [streets, setStreets] = useState<Street[]>([]);
   const [accidents, setAccidents] = useState<Accident[]>([]);
+  const [plannedAccidents, setPlannedAccidents] = useState<Accident[]>([]);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   const [selectedOtg, setSelectedOtg] = useState<number | ''>('');
@@ -173,8 +174,12 @@ const App: React.FC = () => {
       const fetchAccidents = async () => {
         setIsLoading(prev => ({ ...prev, accidents: true }));
         try {
-          const data = await apiClient.getAccidents(selectedCity, selectedStreet);
+          const [data, planned] = await Promise.all([
+            apiClient.getAccidents(selectedCity, selectedStreet),
+            apiClient.getPlannedAccidents(selectedCity, selectedStreet).catch(() => [] as Accident[]),
+          ]);
           setAccidents(data);
+          setPlannedAccidents(planned);
         } catch (error) {
           console.error('Failed to fetch accidents:', error);
         } finally {
@@ -183,7 +188,10 @@ const App: React.FC = () => {
       };
       fetchAccidents();
     } else {
-      if (!isAutoLoading.current) setAccidents([]);
+      if (!isAutoLoading.current) {
+        setAccidents([]);
+        setPlannedAccidents([]);
+      }
     }
   }, [selectedCity, selectedStreet]);
 
@@ -243,8 +251,12 @@ const App: React.FC = () => {
 
     try {
       setIsLoading(prev => ({ ...prev, accidents: true }));
-      const data = await apiClient.getAccidents(addr.cityId, addr.streetId);
+      const [data, planned] = await Promise.all([
+        apiClient.getAccidents(addr.cityId, addr.streetId),
+        apiClient.getPlannedAccidents(addr.cityId, addr.streetId).catch(() => [] as Accident[]),
+      ]);
       setAccidents(data);
+      setPlannedAccidents(planned);
       
       const [citiesData, streetsData] = await Promise.all([
         apiClient.getCities(addr.otgId),
@@ -296,10 +308,15 @@ const App: React.FC = () => {
     return savedAddresses.find(a => a.streetId === selectedStreet && a.cityId === selectedCity)?.streetName ?? '';
   }, [streets, selectedStreet, selectedCity, savedAddresses]);
 
+  const allOutages = useMemo(
+    () => [...accidents, ...plannedAccidents],
+    [accidents, plannedAccidents],
+  );
+
   const filteredAccidents = useMemo(() => {
-    if (!buildingNumber) return accidents;
-    return accidents.filter(a => isBuildingAffected(buildingNumber, a.buildingNames));
-  }, [accidents, buildingNumber]);
+    if (!buildingNumber) return allOutages;
+    return allOutages.filter(a => isBuildingAffected(buildingNumber, a.buildingNames));
+  }, [allOutages, buildingNumber]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '---';

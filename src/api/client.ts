@@ -69,6 +69,15 @@ export const apiClient = {
     return getMembers<Accident>(data);
   },
 
+  getPlannedAccidents: async (cityId: number, streetId: number) => {
+    const data = await fetchFromAPI<unknown>('/pw_accident_planeds', {
+      pagination: false,
+      'city.id': cityId,
+      'street.id': streetId,
+    });
+    return getMembers<Accident>(data);
+  },
+
   checkLight: async (accountNumber: string) => {
     return await fetchFromAPI<{ light: boolean, res: boolean, date_plan_in?: string, comment?: string }>('/check-light', {
       number: accountNumber,
