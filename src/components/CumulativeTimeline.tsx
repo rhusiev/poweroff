@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, ZapOff, AlertTriangle } from 'lucide-react';
 interface CumulativeTimelineProps {
   accidents: Accident[];
   buildingNumber: string;
+  streetName: string;
   lastSync: string | null;
 }
 
@@ -35,7 +36,7 @@ const getStatus = (acc: Accident, isDataOld: boolean): Status => {
   return 'gray';
 };
 
-const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, lastSync }) => {
+const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buildingNumber, streetName, lastSync }) => {
   const todayStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -114,6 +115,12 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
     const activeSegment = segments.find(s => currentMinute >= s.start && currentMinute < s.end);
     return activeSegment ? activeSegment.status : 'green';
   }, [segments, currentMinute, isDataOld]);
+
+  const addressLine = buildingNumber
+    ? streetName
+      ? `вул. ${streetName}, буд. ${buildingNumber}`
+      : `буд. ${buildingNumber}`
+    : 'Оберіть номер будинку';
 
   const getStatusColor = (status: Status) => {
     switch (status) {
@@ -242,7 +249,7 @@ const CumulativeTimeline: React.FC<CumulativeTimelineProps> = ({ accidents, buil
               {getStatusLabel(currentStatus)}
             </h3>
             <p className="font-bold text-sm uppercase tracking-widest text-slate-500 dark:text-slate-400">
-              {buildingNumber ? `вул. ${accidents[0]?.street.name}, буд. ${buildingNumber}` : 'Оберіть номер будинку'}
+              {addressLine}
             </p>
           </div>
         </div>

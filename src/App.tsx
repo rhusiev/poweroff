@@ -289,6 +289,13 @@ const App: React.FC = () => {
     return false;
   };
 
+  const selectedStreetName = useMemo(() => {
+    if (!selectedStreet) return '';
+    const fromList = streets.find(s => s.id === selectedStreet)?.name;
+    if (fromList) return fromList;
+    return savedAddresses.find(a => a.streetId === selectedStreet && a.cityId === selectedCity)?.streetName ?? '';
+  }, [streets, selectedStreet, selectedCity, savedAddresses]);
+
   const filteredAccidents = useMemo(() => {
     if (!buildingNumber) return accidents;
     return accidents.filter(a => isBuildingAffected(buildingNumber, a.buildingNames));
@@ -610,6 +617,7 @@ const App: React.FC = () => {
                   <CumulativeTimeline 
                     accidents={filteredAccidents} 
                     buildingNumber={buildingNumber} 
+                    streetName={selectedStreetName}
                     lastSync={lastSync} 
                   />
                 ) : selectedStreet ? (
