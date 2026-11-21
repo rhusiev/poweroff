@@ -598,9 +598,11 @@ const App: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); removeSavedAddress(addr.id); }}
-                              className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                              className="shrink-0 p-2 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                              aria-label={`Видалити ${addr.customName}`}
+                              title="Видалити адресу"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
