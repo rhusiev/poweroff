@@ -84,6 +84,8 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('saved_addresses');
     return saved ? JSON.parse(saved) : [];
   });
+  const [removedAddress, setRemovedAddress] = useState<{ address: SavedAddress; index: number } | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
   const [customName, setCustomName] = useState('');
 
   const [accountNumber, setAccountNumber] = useState('');
@@ -107,6 +109,12 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('saved_addresses', JSON.stringify(savedAddresses));
   }, [savedAddresses]);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -282,7 +290,34 @@ const App: React.FC = () => {
   };
 
   const removeSavedAddress = (id: string) => {
+    const index = savedAddresses.findIndex(a => a.id === id);
+    if (index === -1) return;
+
     setSavedAddresses(prev => prev.filter(a => a.id !== id));
+    setRemovedAddress({ address: savedAddresses[index], index });
+
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = window.setTimeout(() => {
+      setRemovedAddress(null);
+      undoTimerRef.current = null;
+    }, 6000);
+  };
+
+  const undoRemoveAddress = () => {
+    if (!removedAddress) return;
+    const { address, index } = removedAddress;
+
+    setSavedAddresses(prev => {
+      if (prev.some(a => a.id === address.id)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(index, next.length), 0, address);
+      return next;
+    });
+    setRemovedAddress(null);
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
   };
 
   const loadSavedAddress = async (addr: SavedAddress) => {
@@ -626,6 +661,19 @@ const App: React.FC = () => {
                           className="text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-widest hover:underline"
                         >
                           Перейти до пошуку
+                        </button>
+                      </div>
+                    )}
+                    {removedAddress && (
+                      <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-slate-800 dark:bg-slate-700 text-white animate-in fade-in duration-300">
+                        <span className="text-[11px] font-bold uppercase tracking-wider truncate">
+                          Видалено: {removedAddress.address.customName}
+                        </span>
+                        <button
+                          onClick={undoRemoveAddress}
+                          className="shrink-0 text-[11px] font-black uppercase tracking-widest text-amber-300 hover:text-amber-200"
+                        >
+                          Скасувати
                         </button>
                       </div>
                     )}
