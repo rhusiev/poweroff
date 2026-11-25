@@ -100,7 +100,7 @@ nav.tabs button[aria-current="page"] svg { stroke-width: 2.2; }
 .card.place .tl-wrap { position: relative; z-index: 1; pointer-events: none; }
 .card.place .seg-win { pointer-events: auto; }
 .card-title { margin-bottom: var(--s8); }
-.pin-mark { vertical-align: -2px; margin-right: var(--s4); }
+.pin-mark { display: inline-block; vertical-align: -2px; margin-right: var(--s4); }
 .dash-add { margin-top: var(--s12); }
 .card .addr { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card .sub { font-size: 14px; color: var(--text2); margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -306,13 +306,11 @@ button.step-chip { display: inline-flex; align-items: center; min-height: 44px; 
   nav.tabs button[aria-current="page"] svg { stroke-width: 2.6; }
   .notice { left: auto; right: max(32px, calc((100dvw - 232px - 1080px) / 2 + 32px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); top: auto; transform: translateX(var(--dx, 0px)); }
   .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--s16); }
-  .dash-grid > .card { margin-bottom: 0; }
-  .dash-grid > div { grid-column: 1 / -1; }
+  .dash-grid > .card, .dash-grid > .skeleton { margin-bottom: 0; }
+  /* The add button takes the next free cell, one card wide, so it never stretches under one card. */
+  .dash-grid > .dash-add { margin-top: 0; align-self: start; }
   .detail-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--s24); align-items: stretch; }
   .detail-actions { display: flex; flex-direction: column; justify-content: space-between; }
-  .groups-layout { display: grid; grid-template-columns: 320px 1fr; gap: var(--s16); align-items: stretch; }
-  .groups-layout .groupgrid { align-self: stretch; align-content: space-between; margin-bottom: 0; }
-  .compare-layout { display: grid; grid-template-columns: 320px 1fr; gap: var(--s16); align-items: start; }
   .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s16); align-items: start; }
   .settings-grid > .card { margin-bottom: 0; }
   .add-tree { max-width: 720px; }
@@ -328,6 +326,12 @@ button.step-chip { display: inline-flex; align-items: center; min-height: 44px; 
   .map-wrap.picker .map-gps { right: 388px; }
   .map-hint { display: none; }
   .map-hint-dock { display: block; text-align: center; padding: var(--s12) var(--s16); border-radius: 999px; background: var(--surface); color: var(--text2); border: 1px solid var(--border); box-shadow: var(--shadow-float); font-size: 12px; font-weight: 600; }
+}
+/* Side by side from 1024 px. At 768 px the timeline column would be about 140 px wide. */
+@media (min-width: 1024px) {
+  .groups-layout { display: grid; grid-template-columns: 320px 1fr; gap: var(--s16); align-items: start; }
+  .groups-layout .groupgrid { margin-bottom: 0; }
+  .compare-layout { display: grid; grid-template-columns: 320px 1fr; gap: var(--s16); align-items: start; }
 }
 @media (min-width: 1280px) {
   .add-tree { max-width: none; }

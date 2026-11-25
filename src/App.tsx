@@ -167,7 +167,7 @@ const App = () => {
   const screens: Record<View, () => ReactNode> = {
     dashboard: () => (
       <>
-        {offline ? retryBanner : syncOld && <Banner>Дані застаріли (понад 48 год)</Banner>}
+        {offline ? retryBanner : syncOld && lastSync !== null && <Banner>Дані застаріли (понад 48 год)</Banner>}
         <PlaceList snapshots={cards} minute={clock.minute} onOpen={snapshot => openPlace(snapshot.address.id)} onAdd={openAdd} />
       </>
     ),

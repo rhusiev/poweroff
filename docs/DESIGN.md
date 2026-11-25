@@ -171,8 +171,11 @@ event that does not name the building still shows as possible, with the reason
 - Multi-column layout: dashboard cards fill the row in columns at least 320 px
   wide, so no width leaves a gap beside them: two columns at 1024 and 1280,
   three from about 1400. A 320 px card is about as wide as a phone card, so its
-  name and hour labels fit; detail 1.5fr/1fr; groups and compare 320px/1fr;
-  settings 1fr/1fr. Add-directory keeps a sticky search and a scrollable
+  name and hour labels fit. «+ Додати адресу» takes the next free cell, one
+  card wide. Detail 1.5fr/1fr; settings 1fr/1fr. Groups and compare put the
+  picker beside the timelines (320px/1fr) from 1024 px and stack below that.
+  Compare always shows one place per row in a single column, so the eye moves
+  down one shared time axis. Add-directory keeps a sticky search and a scrollable
   suggestion grid. Add-map puts the map beside a 360 px search column with the
   bar and sheet docked at its bottom. Saved map fills the width and fits bounds
   over all saved pins.
