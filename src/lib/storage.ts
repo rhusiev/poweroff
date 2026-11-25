@@ -18,7 +18,7 @@ const KEYS = {
 } as const;
 const LEGACY_PLACES = 'saved_addresses';
 const LEGACY_THEME = 'theme';
-/** An unreadable places value is copied here before it can be overwritten. */
+/** Unreadable places values are kept here, as a JSON list, before they can be overwritten. */
 const UNREADABLE_PLACES = 'po:places-unreadable';
 
 export type Theme = 'light' | 'dark' | 'auto';
@@ -94,11 +94,16 @@ export function parsePlaces(raw: string): SavedAddress[] | null {
 
 export const PLACES_KEY = KEYS.places;
 
-/** Copy an unreadable places value aside; a later different one gets its own key. */
+/** Add an unreadable places value to the kept list, once. */
 function keepUnreadable(raw: string) {
-  const kept = read(UNREADABLE_PLACES);
-  if (kept === raw) return;
-  write(kept === null ? UNREADABLE_PLACES : `${UNREADABLE_PLACES}-${Date.now()}`, raw);
+  let kept: unknown;
+  try {
+    kept = JSON.parse(read(UNREADABLE_PLACES) ?? '[]');
+  } catch {
+    kept = [];
+  }
+  const list = Array.isArray(kept) ? kept : [kept];
+  if (!list.includes(raw)) write(UNREADABLE_PLACES, JSON.stringify([...list, raw]));
 }
 
 export function loadPlaces(): SavedAddress[] {

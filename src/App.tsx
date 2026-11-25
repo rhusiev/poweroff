@@ -66,9 +66,13 @@ const App = () => {
   );
   // The offline screen states the data's age, so it may show the last stored answers.
   const offlineSnapshots = useMemo(
-    () => buildPlaceSnapshots(places, placeData, operator.schedule ?? operator.cachedSchedule, clock, lastSync, now, { acceptCached: true }),
-    [places, placeData, operator.schedule, operator.cachedSchedule, clock, lastSync, now],
+    () => buildPlaceSnapshots(places, placeData, operator.schedule ?? operator.cached?.schedule ?? null, clock, lastSync, now, { acceptCached: true }),
+    [places, placeData, operator.schedule, operator.cached, clock, lastSync, now],
   );
+  // The offline screen is as old as the oldest answer it shows.
+  const shownAt = [operator.cached?.at, ...places.map(place => placeData.data[place.id]?.fetchedAt)]
+    .filter((at): at is number => typeof at === 'number');
+  const offlineText = shownAt.length ? `Дані від ${formatKyivStamp(new Date(Math.min(...shownAt)), now)}` : '';
   // Ids deleted in another tab drop out here, so they never count toward the cap.
   const comparing = compareIds.filter(id => places.some(place => place.id === id));
   const statusKey = snapshots.map(snapshot => `${snapshot.address.id}:${snapshot.status}`).join('|');
@@ -187,7 +191,7 @@ const App = () => {
     offline: () => (
       <>
         <div className="card">
-          <p className="label">Показуємо останні дані. {syncText}</p>
+          <p className="label">Показуємо останні дані. {offlineText}</p>
           <Button variant="primary" onClick={retry} disabled={operator.refreshing}>Повторити спробу</Button>
         </div>
         <PlaceList snapshots={orderCards(offlineSnapshots)} minute={clock.minute} />

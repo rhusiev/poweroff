@@ -40,12 +40,15 @@ export function PickAddressMap({
   useEffect(() => { notify.current = onNotice; }, [onNotice]);
 
   const [picked, setPicked] = useState<Picked | null>(null);
-  // The place a save in progress belongs to; null once it is dismissed or the screen closes.
+  // A save reads the latest form values after its lookup, and is dropped when the
+  // point was dismissed, picked again or the screen closed meanwhile.
   const pickedNow = useRef<Picked | null>(null);
+  const pickCount = useRef(0);
+  useEffect(() => { pickedNow.current = picked; }, [picked]);
   useEffect(() => {
-    pickedNow.current = picked;
-    return () => { pickedNow.current = null; };
-  }, [picked]);
+    pickCount.current += 1;
+    return () => { pickCount.current += 1; };
+  }, [picked?.lat, picked?.lon]);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<GeocodeHit[]>([]);
   const [noResults, setNoResults] = useState(false);
@@ -55,6 +58,8 @@ export function PickAddressMap({
   const [streetOptions, setStreetOptions] = useState<Street[]>([]);
   const [streetId, setStreetId] = useState<number | undefined>(undefined);
   const [name, setName] = useState('');
+  const nameNow = useRef(name);
+  useEffect(() => { nameNow.current = name; }, [name]);
   const [locating, setLocating] = useState(false);
 
   const startLookup = () => {
@@ -168,16 +173,18 @@ export function PickAddressMap({
   const save = async () => {
     if (!picked || !picked.building.trim() || busy) return;
     setBusy(true);
+    const pick = pickCount.current;
     notify.current('Шукаємо в довіднику…');
     try {
       const official = await resolveOfficial(picked, streetId ?? streetOptions[0]?.id);
-      // Editing the name or building keeps the point; only a new point or a dismissal cancels.
-      if (pickedNow.current?.lat !== picked.lat || pickedNow.current?.lon !== picked.lon) return;
+      const current = pickedNow.current;
+      if (pickCount.current !== pick || !current) return;
       if (!official) throw new Error('Адресу не знайдено в офіційному довіднику. Спробуйте пошук за вулицею');
-      const building = picked.building.trim();
+      const building = current.building.trim();
+      if (!building) return;
       onSave({
         id: newId(),
-        customName: name.trim() || `${official.streetName}, ${building}`,
+        customName: nameNow.current.trim() || `${official.streetName}, ${building}`,
         ...official,
         buildingNumber: building,
         lat: picked.lat,

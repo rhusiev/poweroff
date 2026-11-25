@@ -66,7 +66,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   // Map tiles, the geocoder and the operator API go straight to the network.
-  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api-proxy')) return;
+  // Live data is never answered from this cache; the app keeps its own dated copy.
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api-proxy') || url.pathname === '/gpv') return;
 
   if (request.mode === 'navigate') {
     event.respondWith(networkFirst(event, '/'));

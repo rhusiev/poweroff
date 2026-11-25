@@ -45,8 +45,11 @@ export interface PlaceSnapshot {
 }
 
 export const PLACE_REFRESH_MS = 5 * 60 * 1000;
-/** Place data older than three missed refreshes is not shown as current. Chosen, not derived. */
-export const PLACE_MAX_AGE_MS = 3 * PLACE_REFRESH_MS;
+/** Operator data older than three missed refreshes is not shown as current. Chosen, not derived. */
+export const DATA_MAX_AGE_MS = 3 * PLACE_REFRESH_MS;
+
+/** True when an answer that arrived at `at` may still be shown as current. */
+export const isCurrent = (at: number | undefined, now: Date) => now.getTime() - (at ?? 0) <= DATA_MAX_AGE_MS;
 const POSSIBLE_TYPE = 30;
 
 /** Latin letters that look like Cyrillic ones in building numbers. */
@@ -185,7 +188,7 @@ interface Context {
 function isFresh(context: Context, place: PlaceData | undefined): place is PlaceData {
   if (!place) return false;
   if (context.acceptCached) return true;
-  return !context.failed.has(context.id) && context.now.getTime() - (place.fetchedAt ?? 0) <= PLACE_MAX_AGE_MS;
+  return !context.failed.has(context.id) && isCurrent(place.fetchedAt, context.now);
 }
 
 function snapshotReason(context: Context, fresh: boolean, todayGpv: GpvWindow[] | undefined, active?: StatusWindow) {

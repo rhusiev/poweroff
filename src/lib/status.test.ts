@@ -79,6 +79,16 @@ describe('windows', () => {
   });
 });
 
+describe('unreadable event times', () => {
+  const unreadable = accident({ dateEvent: '25.11.2026 10:00' });
+  it('makes the day unknown for an event that names the building', () => {
+    expect(buildWindows({ accidents: [unreadable], gpvToday: [], gpvTomorrow: [], today })).toMatchObject([{ status: 'gray', source: 'unknown' }]);
+  });
+  it('ignores a street event that may not cover the building', () => {
+    expect(buildWindows({ accidents: [], possible: [unreadable], gpvToday: [], gpvTomorrow: [], today })).toEqual([]);
+  });
+});
+
 describe('nextChange', () => {
   it('counts down to when power returns, not to the next edge', () => {
     // Emergency 10-14 and GPV 12-16: power is off until 16:00.

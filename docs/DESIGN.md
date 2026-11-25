@@ -65,9 +65,9 @@ only on timelines and in the legend, which share one set of fill classes.
 Severity for overlaps: emergency > planned > possible > unknown > on. Unknown
 never hides a known outage: when the group or today's schedule is unknown,
 the place's known events still show and only the rest of the day is gray. A
-place is unknown when its data did not arrive in this session, its last
-answer is older than 15 minutes or its last fetch failed, or the operator's
-last sync is older than 48 hours. An event for the building whose start
+place is unknown when its last answer or the schedule arrived more than 15
+minutes ago, its last fetch failed, the schedule is the server's stale copy,
+or the operator's last sync is older than 48 hours. An event for the building whose start
 cannot be read makes the place unknown, not clear.
 
 Groups come from `chergGpv`. «X.Y» shows as «Черга X.Y». Only the official value
@@ -210,8 +210,9 @@ event that does not name the building still shows as possible, with the reason
   disclosure.
 - Offline: the last good schedule and the last good answer for each place are
   kept on the device. The dashboard never shows them as current. The offline
-  screen («В офлайн» on the retry banner) shows them as they were, under the
-  operator's sync time, so an outage plan stays readable without a network.
+  screen («В офлайн» on the retry banner) shows them as they were, so an
+  outage plan stays readable without a network. Its «Дані від» time is the
+  oldest answer shown. After 48 hours without a sync it turns gray too.
   «Офлайн» replaces the sync time in the header. Retry refetches
   without a reload, and the app refetches on reconnect. A place still loading
   says «Оновлюємо дані…». A failed fetch says «Не вдалося отримати дані». A

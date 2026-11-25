@@ -48,7 +48,9 @@ The app has no backend of its own. Both sources are official LOE data.
 - `/gpv` is the hourly outage schedule (GPV). `server/gpv.js` parses it from
   the HTML that LOE publishes at
   `https://api.loe.lviv.ua/api/menus?page=1&type=photo-grafic` and caches it
-  for 5 minutes. When no schedule was ever parsed, `/gpv` answers 503
+  for 5 minutes. When a refresh fails, it serves the last good copy with
+  `stale: true`, which the app does not show as current. When no schedule was
+  ever parsed, `/gpv` answers 503
 
 Behavior of the LOE data that the code depends on, as seen on 2026-11-25:
 

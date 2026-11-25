@@ -7,7 +7,6 @@ class MemoryStorage {
   setItem(key: string, value: string) { this.items.set(key, value); }
   removeItem(key: string) { this.items.delete(key); }
   clear() { this.items.clear(); }
-  valuesWithPrefix(prefix: string) { return [...this.items].filter(([key]) => key.startsWith(prefix)).map(([, value]) => value); }
 }
 
 const legacyPlace = {
@@ -39,7 +38,7 @@ describe('places', () => {
   it('keeps an unreadable value before it can be overwritten', () => {
     localStorage.setItem('po:places', '{broken');
     expect(loadPlaces()).toEqual([]);
-    expect(localStorage.getItem('po:places-unreadable')).toBe('{broken');
+    expect(JSON.parse(localStorage.getItem('po:places-unreadable')!)).toEqual(['{broken']);
   });
 
   it('keeps a second, different unreadable value too', () => {
@@ -48,8 +47,7 @@ describe('places', () => {
     localStorage.setItem('po:places', '{second');
     loadPlaces();
     loadPlaces();
-    const kept = (localStorage as unknown as MemoryStorage).valuesWithPrefix('po:places-unreadable');
-    expect(kept.sort()).toEqual(['{first', '{second']);
+    expect(JSON.parse(localStorage.getItem('po:places-unreadable')!)).toEqual(['{first', '{second']);
   });
 
   it('falls back to the pre-redesign key when the current value is unreadable', () => {

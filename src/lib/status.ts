@@ -89,10 +89,10 @@ export function isSyncOld(lastSync: string | null, now: Date): boolean {
 
 const UNKNOWN_DAY: StatusWindow = { start: 0, end: DAY_MINUTES, status: 'gray', source: 'unknown' };
 
-function accidentWindow(accident: Accident, status: Status, today: CalendarDay): StatusWindow | null {
+function accidentWindow(accident: Accident, status: Status, today: CalendarDay, coversPlace: boolean): StatusWindow | null {
   const startAt = parseOperatorDate(accident.dateEvent);
-  // An event for this place with an unreadable start may be on now; it must not read as clear.
-  if (!startAt) return { start: 0, end: WINDOW_MINUTES, status: 'gray', source: 'unknown' };
+  // An event for this building with an unreadable start may be on now; it must not read as clear.
+  if (!startAt) return coversPlace ? { start: 0, end: WINDOW_MINUTES, status: 'gray', source: 'unknown' } : null;
   const start = Math.max(0, wallMinuteOf(startAt, today));
   const endAt = parseOperatorDate(accident.datePlanIn);
   const end = endAt ? Math.min(WINDOW_MINUTES, wallMinuteOf(endAt, today)) : WINDOW_MINUTES;
@@ -117,9 +117,9 @@ function gpvWindows(list: GpvWindow[], offset: number): StatusWindow[] {
 /** Every labeled window on the axis, by start time, severe first on ties. */
 export function buildWindows({ accidents, possible = [], gpvToday, gpvTomorrow, today }: WindowInput): StatusWindow[] {
   const windows = [
-    ...accidents.map(accident => accidentWindow(accident, accidentStatus(accident), today)),
+    ...accidents.map(accident => accidentWindow(accident, accidentStatus(accident), today, true)),
     // The only reason to show an event that skips this building is that it may cover it.
-    ...possible.map(accident => accidentWindow(accident, 'yellow', today)),
+    ...possible.map(accident => accidentWindow(accident, 'yellow', today, false)),
   ].filter((window): window is StatusWindow => window !== null);
   windows.push(...(gpvToday ? gpvWindows(gpvToday, 0) : [UNKNOWN_DAY]), ...gpvWindows(gpvTomorrow ?? [], DAY_MINUTES));
   return windows.sort((a, b) => a.start - b.start || SEVERITY[a.status] - SEVERITY[b.status]);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Accident, GpvSchedule, SavedAddress } from '../api/types';
 import { kyivClock } from './kyivTime';
-import { buildPlaceSnapshots, buildingMatches, groupSnapshot, normalizeBuilding, scheduleDay, type PlaceData } from './places';
+import { buildPlaceSnapshots, buildingMatches, groupSnapshot, isCurrent, normalizeBuilding, scheduleDay, type PlaceData } from './places';
 
 describe('building matching', () => {
   it('treats spelling variants of one building as equal', () => {
@@ -122,6 +122,12 @@ describe('stored place data', () => {
   it('is not shown as current when it is old and no fresh answer arrived yet', () => {
     expect(snapshot(place('3.1', [], sixDaysAgo), clear)).toMatchObject({ status: 'gray', dataKnown: false, reason: 'Оновлюємо дані…' });
     expect(snapshot({ accidents: [], planned: [], group: '3.1' }, clear)).toMatchObject({ status: 'gray' });
+  });
+
+  it('counts an answer as current for 15 minutes', () => {
+    expect(isCurrent(now.getTime() - 15 * 60 * 1000, now)).toBe(true);
+    expect(isCurrent(now.getTime() - 15 * 60 * 1000 - 1, now)).toBe(false);
+    expect(isCurrent(undefined, now)).toBe(false);
   });
 
   it('shows on the offline screen as it was stored', () => {
