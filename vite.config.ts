@@ -7,10 +7,18 @@ function gpvSchedule(): Plugin {
   return {
     name: 'gpv-schedule',
     configureServer(server) {
+      // Same contract as server.js: no schedule is a 503, never a 200 with null.
       server.middlewares.use('/gpv', async (_req, res) => {
+        const schedule = await getGpvSchedule()
         res.setHeader('Content-Type', 'application/json')
+        if (!schedule) {
+          res.statusCode = 503
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(JSON.stringify({ error: 'schedule unavailable' }))
+          return
+        }
         res.setHeader('Cache-Control', 'public, max-age=60')
-        res.end(JSON.stringify(await getGpvSchedule()))
+        res.end(JSON.stringify(schedule))
       })
     },
   }

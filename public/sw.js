@@ -1,8 +1,8 @@
-const CACHE_NAME = 'poweroff-v4'; 
+// Bump with every release: activate deletes the old cache, including earlier builds' hashed assets.
+const CACHE_NAME = 'poweroff-v9';
 
-const ASSETS_TO_CACHE =[
+const SHELL = [
   '/',
-  '/index.html',
   '/favicon.svg',
   '/favicon.ico',
   '/favicon-96x96.png',
@@ -10,47 +10,70 @@ const ASSETS_TO_CACHE =[
   '/web-app-manifest-192x192.png',
   '/web-app-manifest-512x512.png',
   '/icon-maskable.svg',
-  '/manifest.json'
+  '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
+      .then(() => self.clients.claim()),
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api-proxy')) {
-    event.respondWith(fetch(event.request));
-    return;
+/** Store only complete same-origin answers; an error page must never be replayed. */
+async function store(key, response) {
+  if (!response.ok || response.type !== 'basic') return;
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(key, response);
+  } catch {
+    // Quota or a closed cache: the next online visit fills it again.
   }
+}
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, networkResponse.clone());
-        });
-        return networkResponse;
-      });
-      return cachedResponse || fetchPromise;
-    })
-  );
+/** Fresh when online, the last good copy when offline. */
+async function networkFirst(event, key) {
+  try {
+    const response = await fetch(event.request);
+    event.waitUntil(store(key, response.clone()));
+    return response;
+  } catch (error) {
+    const cached = await caches.match(key);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+/** Hashed build files never change, so a cached copy is always right. */
+async function cacheFirst(event) {
+  const cached = await caches.match(event.request);
+  if (cached) return cached;
+  const response = await fetch(event.request);
+  event.waitUntil(store(event.request, response.clone()));
+  return response;
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+  // Map tiles, the geocoder and the operator API go straight to the network.
+  // Live data is never answered from this cache; the app keeps its own dated copy.
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api-proxy') || url.pathname === '/gpv') return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(event, '/'));
+  } else if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(cacheFirst(event));
+  } else {
+    event.respondWith(networkFirst(event, request));
+  }
 });

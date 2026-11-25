@@ -10,6 +10,7 @@
 const CMS_MENU_URL = 'https://api.loe.lviv.ua/api/menus?page=1&type=photo-grafic';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15 * 1000;
+const POWER_ON_LINE = /^Електроенергія\s+є\.?$/;
 
 /** @type {{ data: import('../src/api/types').GpvSchedule, at: number } | null} */
 let cached = null;
@@ -18,10 +19,6 @@ let pending = null;
 
 function emptyDay() {
   return { date: null, updated: null, groups: {} };
-}
-
-function emptySchedule() {
-  return { today: emptyDay(), tomorrow: null, stale: false };
 }
 
 function decodeEntities(text) {
@@ -65,6 +62,12 @@ export function parseGpvHtml(rawHtml) {
     if (!groupMatch) continue;
 
     const [, group, rest] = groupMatch;
+    // «Електроенергія є.» is the official "no outage" line; keep it as an empty list,
+    // so a group whose line the parser missed stays distinguishable from a clear day.
+    if (POWER_ON_LINE.test(rest)) {
+      day.groups[group] = [];
+      continue;
+    }
     const windows = [];
     const windowPattern = /з\s+(\d{1,2}:\d{2})\s+до\s+(\d{1,2}:\d{2})/g;
     let windowMatch;
@@ -76,6 +79,8 @@ export function parseGpvHtml(rawHtml) {
 
   return day;
 }
+
+const recognized = day => Boolean(day.date) && Object.keys(day.groups).length > 0;
 
 async function fetchSchedules() {
   const response = await fetch(CMS_MENU_URL, {
@@ -94,13 +99,21 @@ async function fetchSchedules() {
 
   if (!today?.rawHtml) throw new Error('CMS schedule text is empty');
 
-  return {
+  const days = {
     today: parseGpvHtml(today.rawHtml),
     tomorrow: tomorrow?.rawHtml ? parseGpvHtml(tomorrow.rawHtml) : null,
   };
+  // A page whose date or group lines no longer parse is a format change, not a clear day.
+  if (!recognized(days.today)) throw new Error('CMS schedule text is not in the known format');
+  if (days.tomorrow && !recognized(days.tomorrow)) days.tomorrow = null;
+  return days;
 }
 
-/** @returns {Promise<import('../src/api/types').GpvSchedule>} */
+/**
+ * The cached schedule, refreshed every five minutes. A failed refresh serves the
+ * last good copy marked stale; with no copy at all it resolves to null.
+ * @returns {Promise<import('../src/api/types').GpvSchedule | null>}
+ */
 export async function getGpvSchedule() {
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
   if (pending) return pending;
@@ -113,7 +126,7 @@ export async function getGpvSchedule() {
     })
     .catch(error => {
       console.error(`[gpv] schedule fetch failed: ${error.message}`);
-      return cached ? { ...cached.data, stale: true } : { ...emptySchedule(), stale: true };
+      return cached ? { ...cached.data, stale: true } : null;
     })
     .finally(() => {
       pending = null;

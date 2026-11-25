@@ -86,6 +86,7 @@ export interface SyncStatus {
 export interface SavedAddress {
   id: string;
   customName: string;
+  favorite?: boolean;
   otgId: number;
   otgName: string;
   cityId: number;
@@ -93,4 +94,6 @@ export interface SavedAddress {
   streetId: number;
   streetName: string;
   buildingNumber: string;
+  lat?: number;
+  lon?: number;
 }
