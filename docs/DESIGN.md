@@ -168,8 +168,10 @@ event that does not name the building still shows as possible, with the reason
   to 1080px wide.
 - The desktop column holds the same tokens, type, colors, Ukrainian copy and
   status patterns as the phone. No new palette or invented content.
-- Multi-column layout: dashboard cards 320–380 px wide, giving two balanced
-  rows at 1280 and 1440; detail 1.5fr/1fr; groups and compare 320px/1fr;
+- Multi-column layout: dashboard cards fill the row in columns at least 320 px
+  wide, so no width leaves a gap beside them: two columns at 1024 and 1280,
+  three from about 1400. A 320 px card is about as wide as a phone card, so its
+  name and hour labels fit; detail 1.5fr/1fr; groups and compare 320px/1fr;
   settings 1fr/1fr. Add-directory keeps a sticky search and a scrollable
   suggestion grid. Add-map puts the map beside a 360 px search column with the
   bar and sheet docked at its bottom. Saved map fills the width and fits bounds

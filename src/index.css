@@ -305,7 +305,7 @@ button.step-chip { display: inline-flex; align-items: center; min-height: 44px; 
   nav.tabs button[aria-current="page"] { background: var(--surface2); }
   nav.tabs button[aria-current="page"] svg { stroke-width: 2.6; }
   .notice { left: auto; right: max(32px, calc((100dvw - 232px - 1080px) / 2 + 32px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); top: auto; transform: translateX(var(--dx, 0px)); }
-  .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 380px)); gap: var(--s16); }
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--s16); }
   .dash-grid > .card { margin-bottom: 0; }
   .dash-grid > div { grid-column: 1 / -1; }
   .detail-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--s24); align-items: stretch; }
