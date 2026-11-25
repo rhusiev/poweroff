@@ -1,18 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SavedAddress, Street } from '../api/types';
 import { geocodeWithDirectoryFallback, reverseGeocode, resolveOfficial, officialStreetOptions, type GeocodeHit } from '../lib/geo';
+import { newId } from '../lib/storage';
 import { Button, Field } from './UI';
-import { GPS_ICON, TILE_ATTRIBUTION, TILE_URL, pickedPin, youPin } from './mapIcons';
+import { GpsButton } from './GpsButton';
+import { createMap, locateUser, pickedPin } from './mapKit';
 
-const LVIV: [number, number] = [49.8397, 24.0297];
+const MIN_QUERY_LENGTH = 3;
+const MAX_HITS = 5;
+const PLACE_ZOOM = 17;
+const LOCATING_NOTICE_MS = 2000;
 
 interface Picked extends GeocodeHit {
   building: string;
 }
 
-/** Search and place-picking panel over a Leaflet map, following grass-maps. */
+const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
+/**
+ * Search and place-picking panel over a Leaflet map, after the grass-maps
+ * prototype. Search runs only when submitted, as Nominatim's policy requires.
+ */
 export function PickAddressMap({
   onSave,
   onNotice,
@@ -24,14 +34,16 @@ export function PickAddressMap({
   const map = useRef<L.Map | null>(null);
   const pickedMarker = useRef<L.Marker | null>(null);
   const youMarker = useRef<L.Marker | null>(null);
-  const sequence = useRef(0);
-  const controller = useRef<AbortController | null>(null);
-  const fetchedQuery = useRef('');
+  // One lookup at a time: a newer search or tap aborts the older one.
+  const lookup = useRef<AbortController | null>(null);
+  const notify = useRef(onNotice);
+  useEffect(() => { notify.current = onNotice; }, [onNotice]);
 
   const [picked, setPicked] = useState<Picked | null>(null);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<GeocodeHit[]>([]);
   const [noResults, setNoResults] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [streetOptions, setStreetOptions] = useState<Street[]>([]);
@@ -39,13 +51,19 @@ export function PickAddressMap({
   const [name, setName] = useState('');
   const [locating, setLocating] = useState(false);
 
+  const startLookup = () => {
+    lookup.current?.abort();
+    const controller = new AbortController();
+    lookup.current = controller;
+    return controller.signal;
+  };
+
   useEffect(() => {
-    if (!container.current || map.current) return;
-    const instance = L.map(container.current, { zoomControl: false }).setView(LVIV, 13);
-    L.control.zoom({ position: 'topright' }).addTo(instance);
-    L.tileLayer(TILE_URL, { maxZoom: 19, attribution: TILE_ATTRIBUTION }).addTo(instance);
+    if (!container.current) return;
+    const instance = createMap(container.current);
     map.current = instance;
     return () => {
+      lookup.current?.abort();
       instance.remove();
       map.current = null;
     };
@@ -58,150 +76,109 @@ export function PickAddressMap({
     return () => { pickedMarker.current?.remove(); };
   }, [picked]);
 
-  useEffect(() => {
-    const id = ++sequence.current;
-    controller.current?.abort();
-    // Once a place is chosen, keep hits for instant restore on dismiss.
-    // Remember this query so dismiss does not fetch a second time.
-    if (picked) {
-      fetchedQuery.current = query;
-      setNoResults(false);
-      return;
+  /** Show a chosen point and its official street candidates, unless a newer lookup started. */
+  const pick = async (hit: GeocodeHit, signal: AbortSignal) => {
+    setPicked({ ...hit, building: hit.building ?? '' });
+    setStreetId(undefined);
+    setStreetOptions([]);
+    setSheetOpen(true);
+    if (!hit.building) notify.current('Введіть номер будинку.');
+    try {
+      const options = await officialStreetOptions(hit);
+      if (!signal.aborted) setStreetOptions(options);
+    } catch {
+      // Without candidates, saving resolves the street itself.
     }
-    if (query.trim().length < 3) {
-      setHits([]);
-      setNoResults(false);
-      fetchedQuery.current = '';
-      return;
-    }
-    if (query === fetchedQuery.current) return;
-    const timer = window.setTimeout(async () => {
-      const abort = new AbortController();
-      controller.current = abort;
-      fetchedQuery.current = query;
-      try {
-        const rows = await geocodeWithDirectoryFallback(query, abort.signal);
-        if (id === sequence.current && !abort.signal.aborted) {
-          setHits(rows.slice(0, 5));
-          setNoResults(rows.length === 0);
-        }
-      } catch {
-        if (id === sequence.current && !abort.signal.aborted) onNotice('Пошук недоступний.');
-      }
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [query, picked, onNotice]);
+  };
 
   useEffect(() => {
     const instance = map.current;
     if (!instance) return;
     const onClick = async (event: L.LeafletMouseEvent) => {
+      const signal = startLookup();
       setQuery('');
       setHits([]);
       setNoResults(false);
-      let result;
       try {
-        result = await reverseGeocode(event.latlng.lat, event.latlng.lng);
-      } catch {
-        onNotice('Не вдалося визначити адресу.');
-        return;
+        const result = await reverseGeocode(event.latlng.lat, event.latlng.lng, signal);
+        if (signal.aborted) return;
+        if (result) await pick(result, signal);
+        else notify.current('Не вдалося визначити адресу.');
+      } catch (error) {
+        if (!isAbort(error)) notify.current('Не вдалося визначити адресу.');
       }
-      if (!result) {
-        onNotice('Не вдалося визначити адресу.');
-        return;
-      }
-      setPicked({ ...result, building: result.building ?? '' });
-      setStreetOptions(await officialStreetOptions(result));
-      setStreetId(undefined);
-      setSheetOpen(true);
-      if (!result.building) onNotice('Введіть номер будинку.');
     };
     instance.on('click', onClick);
     return () => { instance.off('click', onClick); };
-  }, [onNotice]);
+  }, []);
 
-  const choose = async (hit: GeocodeHit) => {
-    setPicked({ ...hit, building: hit.building ?? '' });
-    setSheetOpen(true);
-    setStreetOptions(await officialStreetOptions(hit));
-    setStreetId(undefined);
-    setQuery(hit.road ?? hit.label.split(',')[0]);
-    map.current?.flyTo([hit.lat, hit.lon], 17);
-    if (!hit.building) onNotice('Введіть номер будинку.');
+  const search = async (event: FormEvent) => {
+    event.preventDefault();
+    const text = query.trim();
+    if (text.length < MIN_QUERY_LENGTH || searching) return;
+    const signal = startLookup();
+    setSearching(true);
+    setPicked(null);
+    try {
+      const rows = await geocodeWithDirectoryFallback(text, signal);
+      if (signal.aborted) return;
+      setHits(rows.slice(0, MAX_HITS));
+      setNoResults(rows.length === 0);
+    } catch (error) {
+      if (!isAbort(error)) notify.current('Пошук недоступний.');
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const clear = () => {
-    setQuery('');
-    setHits([]);
-    setNoResults(false);
-    setPicked(null);
-    setName('');
-    setStreetId(undefined);
-    setSheetOpen(true);
+  const choose = (hit: GeocodeHit) => {
+    map.current?.flyTo([hit.lat, hit.lon], PLACE_ZOOM);
+    pick(hit, startLookup());
   };
 
   const dismissPicked = () => {
+    lookup.current?.abort();
     setPicked(null);
     setName('');
     setStreetId(undefined);
     setSheetOpen(true);
   };
 
+  const clear = () => {
+    dismissPicked();
+    setQuery('');
+    setHits([]);
+    setNoResults(false);
+    setSearching(false);
+  };
+
   const locate = () => {
-    if (!map.current || locating) return;
-    if (!window.isSecureContext) {
-      onNotice('Геолокація працює лише через HTTPS.');
-      return;
-    }
-    if (!navigator.geolocation) {
-      onNotice('Геолокація недоступна у цьому браузері.');
-      return;
-    }
+    if (locating) return;
     setLocating(true);
-    onNotice('Визначаємо ваше місце…', 2000);
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        const point: [number, number] = [position.coords.latitude, position.coords.longitude];
-        map.current?.setView(point, 16);
-        youMarker.current?.remove();
-        youMarker.current = L.marker(point, { icon: youPin() }).addTo(map.current!);
-        setLocating(false);
-      },
-      error => {
-        const reason = error.code === error.PERMISSION_DENIED
-          ? 'дозвіл не надано'
-          : error.code === error.POSITION_UNAVAILABLE
-            ? 'місцеположення недоступне'
-            : 'запит перервано';
-        onNotice(`Не вдалося визначити місце: ${reason}.`);
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    notify.current('Визначаємо ваше місце…', LOCATING_NOTICE_MS);
+    locateUser(() => map.current, youMarker, text => notify.current(text), () => setLocating(false));
   };
 
   const save = async () => {
     if (!picked || !picked.building.trim() || busy) return;
     setBusy(true);
-    onNotice('Шукаємо в довіднику…');
+    notify.current('Шукаємо в довіднику…');
     try {
-      const official = await resolveOfficial(picked, streetId);
+      const official = await resolveOfficial(picked, streetId ?? streetOptions[0]?.id);
       if (!official) throw new Error('Адресу не знайдено в офіційному довіднику. Спробуйте пошук за вулицею.');
-      const address: SavedAddress = {
-        id: crypto.randomUUID?.() ?? `addr-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        customName: name.trim() || `${official.streetName}, ${picked.building.trim()}`,
+      const building = picked.building.trim();
+      onSave({
+        id: newId(),
+        customName: name.trim() || `${official.streetName}, ${building}`,
         ...official,
-        buildingNumber: picked.building.trim(),
+        buildingNumber: building,
         lat: picked.lat,
         lon: picked.lon,
-      };
-      onSave(address);
-      setPicked(null);
-      setName('');
-      setSheetOpen(true);
-      onNotice('Адресу збережено.');
+      });
+      dismissPicked();
+      notify.current('Адресу збережено.');
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Не вдалося зберегти адресу.');
+      notify.current(error instanceof Error ? error.message : 'Не вдалося зберегти адресу.');
     } finally {
       setBusy(false);
     }
@@ -210,43 +187,42 @@ export function PickAddressMap({
   const title = picked
     ? `${picked.road ?? 'Адреса'}${picked.building ? `, ${picked.building}` : ''}`
     : 'Пошук адреси';
+  const chosenStreet = streetId ?? streetOptions[0]?.id;
 
   return (
     <div className="map-wrap picker">
       <div ref={container} className="map" aria-label="Карта" />
-      <button type="button" className="map-gps" onClick={locate} disabled={locating} aria-label="Моє місце (GPS)" dangerouslySetInnerHTML={{ __html: GPS_ICON }} />
+      <GpsButton onClick={locate} busy={locating} />
 
-      {!picked && (
-        <div className="map-hint" aria-hidden="true">Торкніться карти, щоб обрати будинок</div>
-      )}
+      {!picked && <div className="map-hint" aria-hidden="true">Торкніться карти, щоб обрати будинок</div>}
 
       <div className="search-bottom">
-        <div className="search-bar">
+        <form className="search-bar" role="search" onSubmit={search}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input
             id="map-search"
+            type="search"
+            enterKeyHint="search"
             value={query}
             onChange={event => {
               setQuery(event.target.value);
-              if (picked) setPicked(null);
+              setNoResults(false);
+              if (picked) dismissPicked();
             }}
             placeholder="Вулиця, місто"
             aria-label="Пошук вулиці або міста"
           />
-          {query && (
-            <button type="button" className="search-clear" aria-label="Очистити пошук" onClick={clear}>×</button>
-          )}
-        </div>
+          {query && <button type="button" className="search-clear" aria-label="Очистити пошук" onClick={clear}>×</button>}
+          <button type="submit" className="search-go" disabled={query.trim().length < MIN_QUERY_LENGTH || searching}>Знайти</button>
+        </form>
         {!picked && hits.length === 0 && !noResults && (
           <div className="map-hint-dock" aria-hidden="true">Торкніться карти, щоб обрати будинок</div>
         )}
-        {noResults && !picked && hits.length === 0 && (
-          <div className="search-empty" role="status">Нічого не знайдено.</div>
-        )}
+        {noResults && !picked && hits.length === 0 && <div className="search-empty" role="status">Нічого не знайдено.</div>}
         {hits.length > 0 && !picked && (
           <ul className="search-results">
-            {hits.map((hit, index) => (
-              <li key={index}>
+            {hits.map(hit => (
+              <li key={`${hit.lat},${hit.lon}`}>
                 <button type="button" className="opt" onClick={() => choose(hit)}>
                   <span className="search-result-icon" aria-hidden="true">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 21 10 3M17 21 14 3M12 6v2M12 11v2M12 16v2" /></svg>
@@ -275,12 +251,16 @@ export function PickAddressMap({
             {sheetOpen && (
               <>
                 <div className="picked-body">
-                  {streetOptions.length > 0 && (
+                  {streetOptions.length > 1 && (
                     <div className="field">
-                      <label htmlFor="map-street">Вулиця в довіднику</label>
-                      <select id="map-street" value={streetId ?? streetOptions[0].id} onChange={event => setStreetId(Number(event.target.value))}>
-                        {streetOptions.map(street => <option key={street.id} value={street.id}>{street.name}</option>)}
-                      </select>
+                      <div className="field-label" id="map-street">Вулиця в довіднику</div>
+                      <div className="pick" role="radiogroup" aria-labelledby="map-street">
+                        {streetOptions.map(street => (
+                          <button key={street.id} type="button" role="radio" aria-checked={street.id === chosenStreet} onClick={() => setStreetId(street.id)}>
+                            {street.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <Field id="map-building" label="Будинок" value={picked.building} onChange={value => setPicked({ ...picked, building: value })} placeholder="12, 12А" />

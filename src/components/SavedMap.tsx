@@ -1,24 +1,34 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SavedAddress } from '../api/types';
 import { FROM_STATUS } from '../lib/statusLanguage';
 import type { Status } from '../lib/status';
 import { geocode, normalizeStreetName } from '../lib/geo';
-import { GPS_ICON, TILE_ATTRIBUTION, TILE_URL, savedPin, youPin } from './mapIcons';
+import { CITY_ZOOM, createMap, locateUser, savedPin } from './mapKit';
+import { GpsButton } from './GpsButton';
 
-const LVIV: [number, number] = [49.8397, 24.0297];
+const FIT_PADDING_PX = 24;
+/** Places geocoded per visit; the geocoder queue spaces the requests out. */
+const GEOCODE_BATCH = 8;
+
+/** Text-only tooltip content: a place name is user input and must never become markup. */
+const textNode = (text: string) => {
+  const span = document.createElement('span');
+  span.textContent = text;
+  return span;
+};
 
 /** Read-only map: saved places as status-colored markers. No search or add. */
 export function SavedMap({
   savedAddresses,
-  statusOf,
+  statuses,
   onOpen,
   onCoords,
   onNotice,
 }: {
   savedAddresses: SavedAddress[];
-  statusOf: (id: string) => Status;
+  statuses: Record<string, Status>;
   onOpen: (id: string) => void;
   onCoords: (id: string, lat: number, lon: number) => void;
   onNotice: (text: string) => void;
@@ -27,8 +37,9 @@ export function SavedMap({
   const map = useRef<L.Map | null>(null);
   const group = useRef<L.LayerGroup | null>(null);
   const you = useRef<L.Marker | null>(null);
-  const geocoded = useRef<Set<string>>(new Set());
+  const attempted = useRef<Set<string>>(new Set());
   const fittedKey = useRef('');
+  const [locating, setLocating] = useState(false);
 
   const markers = useMemo(
     () => savedAddresses.filter(address => address.lat != null && address.lon != null),
@@ -37,12 +48,11 @@ export function SavedMap({
   const unmapped = savedAddresses.length - markers.length;
 
   useEffect(() => {
-    if (!container.current || map.current) return;
-    const instance = L.map(container.current, { zoomControl: false }).setView(LVIV, 13);
-    L.control.zoom({ position: 'topright' }).addTo(instance);
-    L.tileLayer(TILE_URL, { maxZoom: 19, attribution: TILE_ATTRIBUTION }).addTo(instance);
+    if (!container.current) return;
+    const instance = createMap(container.current);
     map.current = instance;
     group.current = L.layerGroup().addTo(instance);
+    fittedKey.current = '';
     return () => {
       instance.remove();
       map.current = null;
@@ -55,65 +65,62 @@ export function SavedMap({
     if (!layer) return;
     layer.clearLayers();
     markers.forEach(address => {
-      const key = FROM_STATUS[statusOf(address.id)];
-      const color = `var(--${key})`;
-      const marker = L.marker([address.lat!, address.lon!], { icon: savedPin(color) });
-      marker.bindTooltip(address.customName).on('click', () => onOpen(address.id));
-      marker.addTo(layer);
+      const color = `var(--${FROM_STATUS[statuses[address.id] ?? 'gray']})`;
+      L.marker([address.lat!, address.lon!], { icon: savedPin(color) })
+        .bindTooltip(textNode(address.customName))
+        .on('click', () => onOpen(address.id))
+        .addTo(layer);
     });
     const key = markers.map(address => address.id).sort().join('|');
-    if (markers.length > 0 && map.current && key !== fittedKey.current) {
-      fittedKey.current = key;
+    if (!markers.length || !map.current || key === fittedKey.current) return;
+    fittedKey.current = key;
+    if (markers.length === 1) {
+      map.current.setView([markers[0].lat!, markers[0].lon!], CITY_ZOOM);
+    } else {
       const bounds = L.latLngBounds(markers.map(address => [address.lat!, address.lon!] as [number, number]));
-      if (markers.length === 1) {
-        map.current.setView([markers[0].lat!, markers[0].lon!], 13);
-      } else {
-        map.current.fitBounds(bounds, { padding: [24, 24] as L.PointExpression, maxZoom: 13 });
-      }
+      map.current.fitBounds(bounds, { padding: [FIT_PADDING_PX, FIT_PADDING_PX], maxZoom: CITY_ZOOM });
     }
-  }, [markers, statusOf, onOpen]);
+  }, [markers, statuses, onOpen]);
+
+  const missingKey = savedAddresses
+    .filter(address => address.lat == null || address.lon == null)
+    .map(address => address.id)
+    .join('|');
 
   useEffect(() => {
-    let cancelled = false;
-    const missing = savedAddresses.filter(address => address.lat == null || address.lon == null).slice(0, 8);
+    const controller = new AbortController();
+    const missing = savedAddresses
+      .filter(address => (address.lat == null || address.lon == null) && !attempted.current.has(address.id))
+      .slice(0, GEOCODE_BATCH);
     const run = async () => {
       for (const address of missing) {
-        if (cancelled || geocoded.current.has(address.id)) continue;
-        geocoded.current.add(address.id);
-        const street = normalizeStreetName(address.streetName);
-        const results = await geocode(`${street}, ${address.buildingNumber}, ${address.cityName}`);
-        if (cancelled) return;
-        if (results[0]) onCoords(address.id, results[0].lat, results[0].lon);
-        await new Promise(resolve => setTimeout(resolve, 1100));
+        const query = `${normalizeStreetName(address.streetName)}, ${address.buildingNumber}, ${address.cityName}`;
+        try {
+          const [hit] = await geocode(query, controller.signal);
+          attempted.current.add(address.id);
+          if (hit) onCoords(address.id, hit.lat, hit.lon);
+        } catch {
+          // Aborted or refused: the next visit tries again.
+          return;
+        }
       }
     };
-    if (missing.length) run();
-    return () => { cancelled = true; };
-  }, [savedAddresses, onCoords]);
+    run();
+    return () => controller.abort();
+    // Only a change in which places lack coordinates starts a new batch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey, onCoords]);
 
   const locate = () => {
-    if (!map.current) return;
-    if (!window.isSecureContext) {
-      onNotice('Геолокація працює лише через HTTPS.');
-      return;
-    }
-    navigator.geolocation?.getCurrentPosition(
-      position => {
-        const point: [number, number] = [position.coords.latitude, position.coords.longitude];
-        map.current?.setView(point, 16);
-        you.current?.remove();
-        you.current = L.marker(point, { icon: youPin() }).addTo(map.current!);
-      },
-      () => onNotice('Не вдалося визначити місце.'),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    setLocating(true);
+    locateUser(() => map.current, you, onNotice, () => setLocating(false));
   };
 
   return (
     <>
       <div className="map-wrap">
         <div ref={container} className="map" aria-label="Мапа збережених адрес" />
-        <button type="button" className="map-gps" onClick={locate} aria-label="Моє місце (GPS)" dangerouslySetInnerHTML={{ __html: GPS_ICON }} />
+        <GpsButton onClick={locate} busy={locating} />
       </div>
       {unmapped > 0 && <p className="caption">{unmapped} адрес без координат</p>}
     </>

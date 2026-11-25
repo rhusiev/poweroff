@@ -1,5 +1,5 @@
 import { apiClient } from '../api/client';
-import type { City, Street } from '../api/types';
+import type { Street } from '../api/types';
 import { matchesDirectoryName } from './directory';
 
 export interface GeocodeHit {
@@ -82,6 +82,64 @@ export function uniqueGeocodeHits(hits: GeocodeHit[]): GeocodeHit[] {
   });
 }
 
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
+/** Nominatim's usage policy allows one request per second; keep a margin. */
+const NOMINATIM_SPACING_MS = 1100;
+const NOMINATIM_CACHE_SIZE = 200;
+
+let nominatimQueue: Promise<unknown> = Promise.resolve();
+let lastNominatimAt = 0;
+const nominatimCache = new Map<string, Promise<unknown>>();
+
+const abortError = () => new DOMException('Aborted', 'AbortError');
+
+function waitFor(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError());
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(abortError());
+    }, { once: true });
+  });
+}
+
+async function requestNominatim(url: string, signal?: AbortSignal): Promise<unknown> {
+  await waitFor(Math.max(0, lastNominatimAt + NOMINATIM_SPACING_MS - Date.now()), signal);
+  lastNominatimAt = Date.now();
+  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`Nominatim responded ${response.status}`);
+  return response.json();
+}
+
+/**
+ * Every Nominatim request in the app goes through here: one at a time, at
+ * most one per second, and each distinct URL fetched once per session. A
+ * request that fails or is aborted is forgotten, so it can be tried again.
+ */
+export function nominatim(path: 'search' | 'reverse', params: URLSearchParams, signal?: AbortSignal): Promise<unknown> {
+  const url = `${NOMINATIM_URL}/${path}?${params}`;
+  const known = nominatimCache.get(url);
+  if (known) return known;
+  const run = nominatimQueue.then(() => requestNominatim(url, signal));
+  nominatimQueue = run.catch(() => undefined);
+  if (nominatimCache.size >= NOMINATIM_CACHE_SIZE) nominatimCache.delete(nominatimCache.keys().next().value!);
+  nominatimCache.set(url, run);
+  run.catch(() => nominatimCache.delete(url));
+  return run;
+}
+
+interface NominatimRow {
+  lat: string;
+  lon: string;
+  display_name?: string;
+  address?: Record<string, string>;
+}
+
+const roadOf = (address: Record<string, string>) =>
+  address.road || address.pedestrian || address.footway || address.residential || address.square || address.place;
+const cityOf = (address: Record<string, string>) => address.city || address.town || address.village || address.county;
+
 export async function geocode(query: string, signal?: AbortSignal): Promise<GeocodeHit[]> {
   const params = new URLSearchParams({
     format: 'jsonv2',
@@ -93,23 +151,15 @@ export async function geocode(query: string, signal?: AbortSignal): Promise<Geoc
     countrycodes: 'ua',
     q: query,
   });
-  const url = `https://nominatim.openstreetmap.org/search?${params}`;
-  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
-  if (!response.ok) return [];
-  const rows = await response.json() as Array<{
-    lat: string;
-    lon: string;
-    display_name: string;
-    address?: Record<string, string>;
-  }>;
+  const rows = await nominatim('search', params, signal) as NominatimRow[];
   const hits: GeocodeHit[] = rows.map(row => {
     const address = row.address ?? {};
     return {
       lat: Number(row.lat),
       lon: Number(row.lon),
-      label: row.display_name,
-      road: address.road || address.pedestrian || address.footway || address.residential || address.square || address.place,
-      city: address.city || address.town || address.village || address.county,
+      label: row.display_name ?? '',
+      road: roadOf(address),
+      city: cityOf(address),
       building: address.house_number,
       state: address.state || address.region,
     };
@@ -134,24 +184,19 @@ export async function geocodeWithDirectoryFallback(query: string, signal?: Abort
   if (signal?.aborted) return [];
   const candidates = official.filter(street => matchesDirectoryName(street.name, query));
   const best = rankStreets(query, candidates)[0]?.street;
-  if (!best) return [];
-  if (signal?.aborted) return [];
-
-  return geocode(best.name, signal);
+  return best ? geocode(best.name, signal) : [];
 }
 
 export async function reverseGeocode(lat: number, lon: number, signal?: AbortSignal): Promise<GeocodeHit | null> {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uk`;
-  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
-  if (!response.ok) return null;
-  const row = await response.json() as { display_name?: string; address?: Record<string, string>; lat: string; lon: string };
+  const params = new URLSearchParams({ format: 'jsonv2', lat: String(lat), lon: String(lon), 'accept-language': 'uk' });
+  const row = await nominatim('reverse', params, signal) as Partial<NominatimRow>;
   const address = row.address ?? {};
   return {
     lat,
     lon,
     label: row.display_name ?? `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
-    road: address.road || address.pedestrian || address.footway || address.residential || address.square || address.place,
-    city: address.city || address.town || address.village || address.county,
+    road: roadOf(address),
+    city: cityOf(address),
     building: address.house_number,
   };
 }
@@ -165,26 +210,33 @@ export interface OfficialAddress {
   streetName: string;
 }
 
+async function officialCity(name: string) {
+  const cities = await apiClient.findCities(name);
+  const wanted = normalizeStreetName(name);
+  return cities.find(item => normalizeStreetName(item.name) === wanted)
+    ?? cities.find(item => {
+      const official = normalizeStreetName(item.name);
+      return official.includes(wanted) || wanted.includes(official);
+    })
+    ?? cities[0];
+}
+
+async function rankedOfficialStreets(cityId: number, road: string) {
+  const byName = await apiClient.findStreets(cityId, road);
+  const pool = byName.length ? byName : await apiClient.getStreets(cityId);
+  return rankStreets(road, pool).slice(0, 6).map(row => row.street);
+}
+
 /** Resolve a geocoder hit to ids in the official address directory. */
 export async function resolveOfficial(hit: GeocodeHit, streetId?: number): Promise<OfficialAddress | null> {
   if (!hit.city || !hit.road) return null;
-  const cities = await apiClient.findCities(hit.city);
-  const wantedCity = normalizeStreetName(hit.city);
-  const city = cities.find(item => normalizeStreetName(item.name) === wantedCity)
-    ?? cities.find(item => {
-      const name = normalizeStreetName(item.name);
-      return name.includes(wantedCity) || wantedCity.includes(name);
-    })
-    ?? cities[0];
+  const city = await officialCity(hit.city);
   if (!city) return null;
-
   const otgId = Number(city.otg?.['@id']?.split('/').pop());
   if (!Number.isFinite(otgId) || otgId <= 0) return null;
 
-  const byName = await apiClient.findStreets(city.id, hit.road);
-  const pool = byName.length ? byName : await apiClient.getStreets(city.id);
-  const ranked = rankStreets(hit.road, pool).slice(0, 6);
-  const chosen = streetId ? ranked.find(row => row.street.id === streetId)?.street : ranked[0]?.street;
+  const streets = await rankedOfficialStreets(city.id, hit.road);
+  const chosen = streetId ? streets.find(street => street.id === streetId) : streets[0];
   if (!chosen) return null;
 
   return {
@@ -197,22 +249,9 @@ export async function resolveOfficial(hit: GeocodeHit, streetId?: number): Promi
   };
 }
 
+/** Candidate official streets for a geocoder hit, best first. */
 export async function officialStreetOptions(hit: GeocodeHit) {
   if (!hit.city || !hit.road) return [];
-  const cities = await apiClient.findCities(hit.city);
-  const wantedCity = normalizeStreetName(hit.city);
-  const city = cities.find(item => normalizeStreetName(item.name) === wantedCity) ?? cities[0];
-  if (!city) return [];
-  const byName = await apiClient.findStreets(city.id, hit.road);
-  const pool = byName.length ? byName : await apiClient.getStreets(city.id);
-  return rankStreets(hit.road, pool).slice(0, 6).map(row => row.street);
-}
-
-export function cityFromApi(city: City & { otg?: { '@id': string; name: string } }) {
-  return {
-    id: city.id,
-    name: city.name,
-    otgId: Number(city.otg?.['@id']?.split('/').pop()),
-    otgName: city.otg?.name ?? '',
-  };
+  const city = await officialCity(hit.city);
+  return city ? rankedOfficialStreets(city.id, hit.road) : [];
 }

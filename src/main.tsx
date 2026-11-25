@@ -2,13 +2,16 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { applyTheme } from './hooks/useTheme'
+import { loadTheme } from './lib/storage'
+
+// Before the first render, so a dark system theme never flashes light.
+applyTheme(loadTheme());
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
+    navigator.serviceWorker.register('/sw.js').catch(error => {
+      console.warn('Service worker registration failed', error);
     });
   });
 }
