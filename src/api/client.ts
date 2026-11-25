@@ -86,6 +86,26 @@ export const apiClient = {
     return getMembers<Street>(data);
   },
 
+  findCities: async (name: string) => {
+    const data = await fetchFromAPI<unknown>('/pw_cities', { pagination: false, name });
+    return getMembers<City & { otg: { '@id': string; name: string } }>(data);
+  },
+
+  findStreets: async (cityId: number, name: string) => {
+    const data = await fetchFromAPI<unknown>('/pw_streets', {
+      pagination: false,
+      'city.id': cityId,
+      name,
+    });
+    return getMembers<Street>(data);
+  },
+
+  /** Search the whole street directory by name, without a city filter. */
+  findStreetsByName: async (name: string) => {
+    const data = await fetchFromAPI<unknown>('/pw_streets', { pagination: false, name });
+    return getMembers<Street>(data);
+  },
+
   getAccidents: async (cityId: number, streetId: number) => {
     const data = await fetchFromAPI<unknown>('/pw_accidents', {
       pagination: false,
@@ -134,14 +154,9 @@ export const apiClient = {
   },
 
   getGpvSchedule: async (): Promise<GpvSchedule | null> => {
-    try {
-      const response = await fetch('/gpv');
-      if (!response.ok) return null;
-      return await response.json() as GpvSchedule;
-    } catch (error) {
-      console.warn('[API Client] Failed to get GPV schedule', error);
-      return null;
-    }
+    const response = await fetch('/gpv');
+    if (!response.ok) throw new Error(`GPV schedule: ${response.status}`);
+    return await response.json() as GpvSchedule;
   },
 
   checkLight: async (accountNumber: string) => {
@@ -151,15 +166,10 @@ export const apiClient = {
   },
 
   getLastSync: async () => {
-    try {
-      const data = await fetchFromAPI<unknown>('/options', {
-        option_key: 'successful_last_synk',
-      });
-      const members = getMembers<SyncStatus>(data);
-      return members[0]?.date || members[0]?.option_value || null;
-    } catch (e) {
-      console.warn('[API Client] Failed to get sync time', e);
-      return null;
-    }
+    const data = await fetchFromAPI<unknown>('/options', {
+      option_key: 'successful_last_synk',
+    });
+    const members = getMembers<SyncStatus>(data);
+    return members[0]?.date || members[0]?.option_value || null;
   },
 };
