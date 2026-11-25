@@ -30,6 +30,16 @@ Theme is `data-theme="light|dark"` on `<html>`; auto follows the system. The
 saved theme is applied before the first render, so the page never flashes the
 wrong theme. The `theme-color` meta follows `--bg`.
 
+## App icon
+
+The icon is a horizontal battery in white on `--primary` with two cells: a
+solid white cell for power on and a cell in the planned stripe. It was chosen
+on 2026-11-25 as «Дві поділки» from three icon rounds. `public/favicon.svg` is
+the source. `public/icon-maskable.svg` is the same drawing at 80% so it stays
+inside the maskable safe circle. The PNG and ICO files are rendered from
+`favicon.svg` with `rsvg-convert` and ImageMagick. At 16 px the striped cell
+has only 1.72:1 contrast on the green and reads as a dark cell
+
 ## Grid and type
 
 4px base; scale 4, 8, 12, 16, 20, 24, 32, 48. On phone the content is one

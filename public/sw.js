@@ -1,5 +1,5 @@
 // Bump on every deploy that changes this file; old caches are deleted on activate.
-const CACHE_NAME = 'poweroff-v7';
+const CACHE_NAME = 'poweroff-v8';
 
 const SHELL = [
   '/',
