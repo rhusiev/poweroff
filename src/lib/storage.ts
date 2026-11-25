@@ -14,6 +14,7 @@ const KEYS = {
   compare: 'po:compare',
   lastSync: 'po:lastSync',
   placeData: 'po:placeData',
+  schedule: 'po:schedule',
 } as const;
 const LEGACY_PLACES = 'saved_addresses';
 const LEGACY_THEME = 'theme';
@@ -93,13 +94,22 @@ export function parsePlaces(raw: string): SavedAddress[] | null {
 
 export const PLACES_KEY = KEYS.places;
 
+/** Copy an unreadable places value aside; a later different one gets its own key. */
+function keepUnreadable(raw: string) {
+  const kept = read(UNREADABLE_PLACES);
+  if (kept === raw) return;
+  write(kept === null ? UNREADABLE_PLACES : `${UNREADABLE_PLACES}-${Date.now()}`, raw);
+}
+
 export function loadPlaces(): SavedAddress[] {
-  const raw = read(KEYS.places) ?? read(LEGACY_PLACES);
-  if (raw === null) return [];
-  const places = parsePlaces(raw);
-  if (places) return places;
-  // Keep the unreadable value so the next save cannot destroy it.
-  if (read(UNREADABLE_PLACES) === null) write(UNREADABLE_PLACES, raw);
+  // An unreadable current value falls back to the legacy key before giving up.
+  for (const key of [KEYS.places, LEGACY_PLACES]) {
+    const raw = read(key);
+    if (raw === null) continue;
+    const places = parsePlaces(raw);
+    if (places) return places;
+    keepUnreadable(raw);
+  }
   return [];
 }
 
@@ -140,16 +150,19 @@ export function loadLastSync(): string | null {
 
 export const saveLastSync = (value: string) => write(KEYS.lastSync, value);
 
-/** The last good operator answer per place, so the offline screen has something true to show. */
-export function loadPlaceData<T>(): Record<string, T> {
-  const raw = read(KEYS.placeData);
-  if (!raw) return {};
+function readObject<T>(key: string): T | null {
+  const raw = read(key);
+  if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, T> : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as T : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
+/** The last good operator answers, so the offline screen has something true to show. */
+export const loadPlaceData = <T,>(): Record<string, T> => readObject<Record<string, T>>(KEYS.placeData) ?? {};
 export const savePlaceData = <T,>(data: Record<string, T>) => write(KEYS.placeData, JSON.stringify(data));
+export const loadSchedule = <T,>(): T | null => readObject<T>(KEYS.schedule);
+export const saveSchedule = <T,>(schedule: T) => write(KEYS.schedule, JSON.stringify(schedule));

@@ -63,9 +63,12 @@ The pill is icon, word and a 14% tint of the status color. The patterns appear
 only on timelines and in the legend, which share one set of fill classes.
 
 Severity for overlaps: emergency > planned > possible > unknown > on. Unknown
-never hides a known outage. A place is unknown when its data never arrived,
-its group is not known, today's schedule is missing, or the operator's last
-sync is older than 48 hours.
+never hides a known outage: when the group or today's schedule is unknown,
+the place's known events still show and only the rest of the day is gray. A
+place is unknown when its data did not arrive in this session, its last
+answer is older than 15 minutes or its last fetch failed, or the operator's
+last sync is older than 48 hours. An event for the building whose start
+cannot be read makes the place unknown, not clear.
 
 Groups come from `chergGpv`. «X.Y» shows as «Черга X.Y». Only the official value
 «Не входить» shows as «Без черги». The most common value among the building's
@@ -101,7 +104,8 @@ event that does not name the building still shows as possible, with the reason
 ## Components and navigation
 
 - `PlaceCard`: an `<article>` with name (one line, ellipsis), sub = group +
-  address (one line), the next-change line, and a compact horizontal Timeline
+  address (one line), a reason line only when the data is unknown, and a
+  compact horizontal Timeline
   36px with only the four-hour gridlines. One stretched button covers the card
   and opens the detail, so the timeline segments stay their own buttons.
   Pinned places sort first, then emergency, planned, possible, on and unknown.
@@ -204,9 +208,11 @@ event that does not name the building still shows as possible, with the reason
   moon icon centered above each label and a 2px underline on the active tab. A
   fresh profile starts on «Системна». Data source and third-party map
   disclosure.
-- Offline: the last good answer for each place is kept on the device, so a
-  cold start without a network still shows the saved places with their last
-  sync time. «Офлайн» replaces the sync time in the header. Retry refetches
+- Offline: the last good schedule and the last good answer for each place are
+  kept on the device. The dashboard never shows them as current. The offline
+  screen («В офлайн» on the retry banner) shows them as they were, under the
+  operator's sync time, so an outage plan stays readable without a network.
+  «Офлайн» replaces the sync time in the header. Retry refetches
   without a reload, and the app refetches on reconnect. A place still loading
   says «Оновлюємо дані…». A failed fetch says «Не вдалося отримати дані». A
   published schedule dated to another day says «Графік на цю добу ще не
@@ -230,5 +236,4 @@ Checked in headless Chromium on 2026-11-25 against the live operator data.
 - Add via directory and map, delete, undo, rename, pin, group picker, compare,
   map pins, theme, reload all exercised with real clicks in the app
 - Typing in the map search sends no geocode request; a submit sends one
-- An offline reload shows the last data and its sync time
 - Not checked: real phones, Safari, Firefox, widths 768–1279 px

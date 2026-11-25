@@ -42,7 +42,13 @@ const address: SavedAddress = {
 const snapshot = (place: PlaceData | undefined, gpv: GpvSchedule | null, failed = new Set<string>()) =>
   buildPlaceSnapshots([address], { data: place ? { a: place } : {}, failed }, gpv, clock, freshSync, now)[0];
 
-const place = (group: PlaceData['group'], accidents: Accident[] = []): PlaceData => ({ accidents, planned: [], group });
+const place = (group: PlaceData['group'], accidents: Accident[] = [], fetchedAt = now.getTime()): PlaceData =>
+  ({ accidents, planned: [], group, fetchedAt });
+
+const emergency = (dateEvent: string): Accident => ({
+  id: 7, typeOff: 1, switchSubReason: 0, dateEvent, datePlanIn: '2026-11-25T14:00:00+02:00',
+  buildingNames: '12', street: { name: '' }, city: { name: '' },
+});
 
 describe('schedule days', () => {
   it('finds a day by its date, even when the page still files it as tomorrow', () => {
@@ -101,6 +107,44 @@ describe('place snapshots', () => {
     };
     const result = snapshot(place('3.1', [possible]), schedule({ '3.1': [{ from: '10:00', to: '12:00' }] }));
     expect(result).toMatchObject({ status: 'red', reason: 'Вікно ГПВ' });
+  });
+});
+
+describe('stored place data', () => {
+  const sixDaysAgo = now.getTime() - 6 * 24 * 60 * 60 * 1000;
+  const clear = schedule({ '3.1': [] });
+
+  it('is not shown as current when its refetch failed', () => {
+    const result = snapshot(place('3.1'), clear, new Set(['a']));
+    expect(result).toMatchObject({ status: 'gray', dataKnown: false, pending: false, reason: 'Не вдалося отримати дані' });
+  });
+
+  it('is not shown as current when it is old and no fresh answer arrived yet', () => {
+    expect(snapshot(place('3.1', [], sixDaysAgo), clear)).toMatchObject({ status: 'gray', dataKnown: false, reason: 'Оновлюємо дані…' });
+    expect(snapshot({ accidents: [], planned: [], group: '3.1' }, clear)).toMatchObject({ status: 'gray' });
+  });
+
+  it('shows on the offline screen as it was stored', () => {
+    const data = { data: { a: place('3.1', [], sixDaysAgo) }, failed: new Set(['a']) };
+    const [result] = buildPlaceSnapshots([address], data, clear, clock, freshSync, now, { acceptCached: true });
+    expect(result).toMatchObject({ status: 'green', dataKnown: true });
+  });
+});
+
+describe('unknown parts of the day', () => {
+  it('still shows a known emergency when the group is unknown', () => {
+    const result = snapshot(place(undefined, [emergency('2026-11-25T10:00:00+02:00')]), schedule({ '3.1': [] }));
+    expect(result).toMatchObject({ status: 'purple', dataKnown: false, reason: 'з 10:00' });
+  });
+
+  it('is gray, not green, outside known events when the group is unknown', () => {
+    const result = snapshot(place(undefined, [emergency('2026-11-25T12:00:00+02:00')]), schedule({ '3.1': [] }));
+    expect(result).toMatchObject({ status: 'gray', next: null });
+  });
+
+  it('is gray, not green, when an event for the building has an unreadable start', () => {
+    const result = snapshot(place('3.1', [emergency('25.11.2026 10:00')]), schedule({ '3.1': [] }));
+    expect(result).toMatchObject({ status: 'gray', next: null });
   });
 });
 

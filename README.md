@@ -32,9 +32,9 @@ node server.js   # serve dist/ with the API proxy and /gpv
 `docker-compose.yml` pulls `ghcr.io/rhusiev/poweroff:${VERSION:-latest}` and
 joins the external `caddy` network.
 
-After any change to the files the service worker precaches, bump `CACHE_NAME`
-in `public/sw.js`. Built files under `/assets/` have hashed names and need no
-bump.
+Bump `CACHE_NAME` in `public/sw.js` with every release. The new name makes the
+service worker delete the old cache, including the hashed `/assets/` files of
+earlier builds, which otherwise pile up.
 
 ## Data sources
 

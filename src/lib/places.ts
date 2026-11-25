@@ -21,6 +21,8 @@ export interface PlaceData {
   accidents: Accident[];
   planned: Accident[];
   group: BuildingGroup;
+  /** When this answer arrived, in ms since the epoch. Older stored entries lack it. */
+  fetchedAt?: number;
 }
 
 export interface PlaceSnapshot {
@@ -43,6 +45,8 @@ export interface PlaceSnapshot {
 }
 
 export const PLACE_REFRESH_MS = 5 * 60 * 1000;
+/** Place data older than three missed refreshes is not shown as current. Chosen, not derived. */
+export const PLACE_MAX_AGE_MS = 3 * PLACE_REFRESH_MS;
 const POSSIBLE_TYPE = 30;
 
 /** Latin letters that look like Cyrillic ones in building numbers. */
@@ -111,7 +115,7 @@ async function loadPlace(address: SavedAddress): Promise<PlaceData> {
     apiClient.getPlannedAccidents(address.cityId, address.streetId),
     apiClient.getBuildingGroup(address.cityId, address.streetId, address.buildingNumber),
   ]);
-  return { accidents, planned, group };
+  return { accidents, planned, group, fetchedAt: Date.now() };
 }
 
 /**
@@ -132,7 +136,9 @@ export function usePlaceData(addresses: SavedAddress[], refreshToken = 0) {
 
   useEffect(() => {
     let cancelled = false;
+    let latest = 0;
     const load = async () => {
+      const run = ++latest;
       const results = await Promise.all(targets.map(async address => {
         try {
           return { id: address.id, place: await loadPlace(address) };
@@ -141,7 +147,8 @@ export function usePlaceData(addresses: SavedAddress[], refreshToken = 0) {
           return { id: address.id, place: dataRef.current[address.id], failed: true };
         }
       }));
-      if (cancelled) return;
+      // A slow earlier run must not overwrite a newer answer.
+      if (cancelled || run !== latest) return;
       const data = Object.fromEntries(results.filter(result => result.place).map(result => [result.id, result.place!]));
       savePlaceData(data);
       setState({ data, failed: new Set(results.filter(result => result.failed).map(result => result.id)) });
@@ -157,8 +164,14 @@ export function usePlaceData(addresses: SavedAddress[], refreshToken = 0) {
   return state;
 }
 
+export interface SnapshotOptions {
+  /** Show the last stored answers as they are, for the offline screen that states their age. */
+  acceptCached?: boolean;
+}
+
 interface Context {
   schedule: GpvSchedule | null;
+  acceptCached: boolean;
   failed: Set<string>;
   todayDay: GpvDay | null;
   tomorrowDay: GpvDay | null;
@@ -168,34 +181,47 @@ interface Context {
   id: string;
 }
 
-function snapshotReason(context: Context, place: PlaceData | undefined, todayGpv: GpvWindow[] | undefined, active?: StatusWindow) {
-  if (!context.schedule || (!place && context.failed.has(context.id))) return 'Не вдалося отримати дані';
-  if (!place) return 'Оновлюємо дані…';
-  if (!context.todayDay) return 'Графік на цю добу ще не опубліковано';
+/** True when this place's answer may be shown as current. */
+function isFresh(context: Context, place: PlaceData | undefined): place is PlaceData {
+  if (!place) return false;
+  if (context.acceptCached) return true;
+  return !context.failed.has(context.id) && context.now.getTime() - (place.fetchedAt ?? 0) <= PLACE_MAX_AGE_MS;
+}
+
+function snapshotReason(context: Context, fresh: boolean, todayGpv: GpvWindow[] | undefined, active?: StatusWindow) {
+  const failed = context.failed.has(context.id);
+  if (!context.schedule || (!fresh && failed)) return 'Не вдалося отримати дані';
+  if (!fresh) return 'Оновлюємо дані…';
   if (context.syncOld) return 'Дані старші за 48 годин';
-  if (!todayGpv) return statusLabel('gray');
+  if (active?.source === 'accident') {
+    if (active.status === 'yellow') return 'Можливе відключення · будинок не вказано в переліку події';
+    return `з ${formatWallMinute(active.start)}`;
+  }
+  if (!context.todayDay) return 'Графік на цю добу ще не опубліковано';
+  if (!todayGpv || active?.source === 'unknown') return statusLabel('gray');
   if (!active) return statusLabel('green');
-  if (active.source === 'gpv') return 'Вікно ГПВ';
-  if (active.status === 'yellow') return 'Можливе відключення · будинок не вказано в переліку події';
-  return `з ${formatWallMinute(active.start)}`;
+  return 'Вікно ГПВ';
 }
 
 function snapshotOf(address: SavedAddress, place: PlaceData | undefined, shared: Omit<Context, 'id'>): PlaceSnapshot {
   const context = { ...shared, id: address.id };
   const { clock } = context;
+  const fresh = isFresh(context, place);
   const group = place?.group;
   const todayGpv = groupWindows(context.todayDay, group);
   const tomorrowGpv = groupWindows(context.tomorrowDay, group);
-  const dataKnown = Boolean(place) && todayGpv !== undefined && !context.syncOld;
+  // Known events still show when the group or schedule is unknown; only the rest of the day turns gray.
+  const usable = fresh && !context.syncOld;
+  const dataKnown = usable && todayGpv !== undefined;
   const tomorrowKnown = dataKnown && tomorrowGpv !== undefined;
   const events = place ? [...place.accidents, ...place.planned] : [];
   const { covers, possible } = splitAccidents(events, address.buildingNumber);
-  const windows = dataKnown
-    ? buildWindows({ accidents: covers, possible, gpvToday: todayGpv ?? [], gpvTomorrow: tomorrowGpv ?? [], today: clock.today })
+  const windows = usable
+    ? buildWindows({ accidents: covers, possible, gpvToday: todayGpv, gpvTomorrow: tomorrowGpv, today: clock.today })
     : [];
   const segments = buildSegments(windows);
-  const status = dataKnown ? statusAt(segments, clock.minute) : 'gray';
-  const next = dataKnown ? nextChange(segments, clock.minute, tomorrowKnown ? WINDOW_MINUTES : DAY_MINUTES) : null;
+  const status = usable ? statusAt(segments, clock.minute) : 'gray';
+  const next = usable ? nextChange(segments, clock.minute, tomorrowKnown ? WINDOW_MINUTES : DAY_MINUTES) : null;
   // The reason describes the window that decides the status, not the earliest one.
   const active = windows.find(window =>
     window.status === status && clock.minute >= window.start && clock.minute < window.end);
@@ -207,7 +233,7 @@ function snapshotOf(address: SavedAddress, place: PlaceData | undefined, shared:
     status,
     next,
     nextIn: next ? minutesUntil(clock.today, next.minute, context.now) : null,
-    reason: snapshotReason(context, place, todayGpv, active),
+    reason: snapshotReason(context, fresh, todayGpv, active),
     dataKnown,
     tomorrowKnown,
     pending: !place && !context.failed.has(address.id),
@@ -221,9 +247,11 @@ export function buildPlaceSnapshots(
   clock: KyivClock,
   lastSync: string | null,
   now: Date,
+  { acceptCached = false }: SnapshotOptions = {},
 ): PlaceSnapshot[] {
   const context: Omit<Context, 'id'> = {
     schedule,
+    acceptCached,
     failed,
     todayDay: scheduleDay(schedule, clock.todayKey),
     tomorrowDay: scheduleDay(schedule, clock.tomorrowKey),

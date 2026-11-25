@@ -31,7 +31,8 @@ export interface StatusWindow {
   status: Status;
   /** The event has no published end and runs to the edge of the axis. */
   open?: boolean;
-  source: 'accident' | 'gpv';
+  /** `unknown` covers time the data says nothing reliable about. */
+  source: 'accident' | 'gpv' | 'unknown';
 }
 
 export interface TimeSegment {
@@ -51,8 +52,10 @@ export interface WindowInput {
   accidents: Accident[];
   /** Events that do not name this building but may cover it. */
   possible?: Accident[];
-  gpvToday: GpvWindow[];
-  gpvTomorrow: GpvWindow[];
+  /** Undefined when today's line for the group is unknown; today is then unknown, not clear. */
+  gpvToday: GpvWindow[] | undefined;
+  /** Undefined when tomorrow is unknown; callers stop the axis at midnight instead. */
+  gpvTomorrow: GpvWindow[] | undefined;
   today: CalendarDay;
 }
 
@@ -84,9 +87,12 @@ export function isSyncOld(lastSync: string | null, now: Date): boolean {
   return !synced || now.getTime() - synced.getTime() > SYNC_MAX_AGE_MS;
 }
 
+const UNKNOWN_DAY: StatusWindow = { start: 0, end: DAY_MINUTES, status: 'gray', source: 'unknown' };
+
 function accidentWindow(accident: Accident, status: Status, today: CalendarDay): StatusWindow | null {
   const startAt = parseOperatorDate(accident.dateEvent);
-  if (!startAt) return null;
+  // An event for this place with an unreadable start may be on now; it must not read as clear.
+  if (!startAt) return { start: 0, end: WINDOW_MINUTES, status: 'gray', source: 'unknown' };
   const start = Math.max(0, wallMinuteOf(startAt, today));
   const endAt = parseOperatorDate(accident.datePlanIn);
   const end = endAt ? Math.min(WINDOW_MINUTES, wallMinuteOf(endAt, today)) : WINDOW_MINUTES;
@@ -115,7 +121,7 @@ export function buildWindows({ accidents, possible = [], gpvToday, gpvTomorrow, 
     // The only reason to show an event that skips this building is that it may cover it.
     ...possible.map(accident => accidentWindow(accident, 'yellow', today)),
   ].filter((window): window is StatusWindow => window !== null);
-  windows.push(...gpvWindows(gpvToday, 0), ...gpvWindows(gpvTomorrow, DAY_MINUTES));
+  windows.push(...(gpvToday ? gpvWindows(gpvToday, 0) : [UNKNOWN_DAY]), ...gpvWindows(gpvTomorrow ?? [], DAY_MINUTES));
   return windows.sort((a, b) => a.start - b.start || SEVERITY[a.status] - SEVERITY[b.status]);
 }
 

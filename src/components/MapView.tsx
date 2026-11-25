@@ -40,6 +40,12 @@ export function PickAddressMap({
   useEffect(() => { notify.current = onNotice; }, [onNotice]);
 
   const [picked, setPicked] = useState<Picked | null>(null);
+  // The place a save in progress belongs to; null once it is dismissed or the screen closes.
+  const pickedNow = useRef<Picked | null>(null);
+  useEffect(() => {
+    pickedNow.current = picked;
+    return () => { pickedNow.current = null; };
+  }, [picked]);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<GeocodeHit[]>([]);
   const [noResults, setNoResults] = useState(false);
@@ -165,6 +171,8 @@ export function PickAddressMap({
     notify.current('Шукаємо в довіднику…');
     try {
       const official = await resolveOfficial(picked, streetId ?? streetOptions[0]?.id);
+      // Editing the name or building keeps the point; only a new point or a dismissal cancels.
+      if (pickedNow.current?.lat !== picked.lat || pickedNow.current?.lon !== picked.lon) return;
       if (!official) throw new Error('Адресу не знайдено в офіційному довіднику. Спробуйте пошук за вулицею');
       const building = picked.building.trim();
       onSave({

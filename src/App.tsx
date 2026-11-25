@@ -64,6 +64,11 @@ const App = () => {
     () => buildPlaceSnapshots(places, placeData, operator.schedule, clock, lastSync, now),
     [places, placeData, operator.schedule, clock, lastSync, now],
   );
+  // The offline screen states the data's age, so it may show the last stored answers.
+  const offlineSnapshots = useMemo(
+    () => buildPlaceSnapshots(places, placeData, operator.schedule ?? operator.cachedSchedule, clock, lastSync, now, { acceptCached: true }),
+    [places, placeData, operator.schedule, operator.cachedSchedule, clock, lastSync, now],
+  );
   // Ids deleted in another tab drop out here, so they never count toward the cap.
   const comparing = compareIds.filter(id => places.some(place => place.id === id));
   const statusKey = snapshots.map(snapshot => `${snapshot.address.id}:${snapshot.status}`).join('|');
@@ -185,7 +190,7 @@ const App = () => {
           <p className="label">Показуємо останні дані. {syncText}</p>
           <Button variant="primary" onClick={retry} disabled={operator.refreshing}>Повторити спробу</Button>
         </div>
-        <PlaceList snapshots={cards} minute={clock.minute} />
+        <PlaceList snapshots={orderCards(offlineSnapshots)} minute={clock.minute} />
       </>
     ),
   };
