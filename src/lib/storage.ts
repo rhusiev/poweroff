@@ -96,13 +96,15 @@ export const PLACES_KEY = KEYS.places;
 
 /** Add an unreadable places value to the kept list, once. */
 function keepUnreadable(raw: string) {
-  let kept: unknown;
+  const stored = read(UNREADABLE_PLACES);
+  let kept: unknown = [];
   try {
-    kept = JSON.parse(read(UNREADABLE_PLACES) ?? '[]');
+    if (stored !== null) kept = JSON.parse(stored);
   } catch {
-    kept = [];
+    // Earlier builds kept one raw value here; keep it as the first entry.
+    kept = [stored];
   }
-  const list = Array.isArray(kept) ? kept : [kept];
+  const list = Array.isArray(kept) ? kept : [stored];
   if (!list.includes(raw)) write(UNREADABLE_PLACES, JSON.stringify([...list, raw]));
 }
 

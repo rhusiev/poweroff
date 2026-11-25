@@ -50,6 +50,13 @@ describe('places', () => {
     expect(JSON.parse(localStorage.getItem('po:places-unreadable')!)).toEqual(['{first', '{second']);
   });
 
+  it('keeps a raw value that an earlier build stored as the backup', () => {
+    localStorage.setItem('po:places-unreadable', '{older');
+    localStorage.setItem('po:places', '{newer');
+    loadPlaces();
+    expect(JSON.parse(localStorage.getItem('po:places-unreadable')!)).toEqual(['{older', '{newer']);
+  });
+
   it('falls back to the pre-redesign key when the current value is unreadable', () => {
     localStorage.setItem('saved_addresses', JSON.stringify([legacyPlace]));
     localStorage.setItem('po:places', '{broken');
