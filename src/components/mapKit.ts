@@ -78,8 +78,8 @@ export function locateUser(
   onDone: () => void,
 ) {
   const unavailable = !window.isSecureContext
-    ? 'Геолокація працює лише через HTTPS.'
-    : !navigator.geolocation ? 'Геолокація недоступна у цьому браузері.' : null;
+    ? 'Геолокація працює лише через HTTPS'
+    : !navigator.geolocation ? 'Геолокація недоступна у цьому браузері' : null;
   if (unavailable) {
     onDone();
     onNotice(unavailable);
@@ -97,7 +97,7 @@ export function locateUser(
     },
     error => {
       onDone();
-      onNotice(`Не вдалося визначити місце: ${locateError(error)}.`);
+      onNotice(`Не вдалося визначити місце: ${locateError(error)}`);
     },
     { enableHighAccuracy: true, timeout: LOCATE_TIMEOUT_MS },
   );

@@ -15,7 +15,7 @@ export function Detail({ snapshot, minute, onRename, onTogglePin, onRemove, onBa
   const [day, setDay] = useState<0 | 1>(0);
   const [name, setName] = useState(snapshot?.address.customName ?? '');
   if (!snapshot) {
-    return <EmptyState title="Місце не знайдено" text="Адресу видалено або дані недоступні." action={<Button onClick={onBack}>До списку</Button>} />;
+    return <EmptyState title="Місце не знайдено" text="Адресу видалено або дані недоступні" action={<Button onClick={onBack}>До списку</Button>} />;
   }
   const { address } = snapshot;
   const group = groupLabel(snapshot.group);

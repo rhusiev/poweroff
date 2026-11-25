@@ -82,7 +82,7 @@ export function PickAddressMap({
     setStreetId(undefined);
     setStreetOptions([]);
     setSheetOpen(true);
-    if (!hit.building) notify.current('Введіть номер будинку.');
+    if (!hit.building) notify.current('Введіть номер будинку');
     try {
       const options = await officialStreetOptions(hit);
       if (!signal.aborted) setStreetOptions(options);
@@ -103,9 +103,9 @@ export function PickAddressMap({
         const result = await reverseGeocode(event.latlng.lat, event.latlng.lng, signal);
         if (signal.aborted) return;
         if (result) await pick(result, signal);
-        else notify.current('Не вдалося визначити адресу.');
+        else notify.current('Не вдалося визначити адресу');
       } catch (error) {
-        if (!isAbort(error)) notify.current('Не вдалося визначити адресу.');
+        if (!isAbort(error)) notify.current('Не вдалося визначити адресу');
       }
     };
     instance.on('click', onClick);
@@ -125,7 +125,7 @@ export function PickAddressMap({
       setHits(rows.slice(0, MAX_HITS));
       setNoResults(rows.length === 0);
     } catch (error) {
-      if (!isAbort(error)) notify.current('Пошук недоступний.');
+      if (!isAbort(error)) notify.current('Пошук недоступний');
     } finally {
       setSearching(false);
     }
@@ -165,7 +165,7 @@ export function PickAddressMap({
     notify.current('Шукаємо в довіднику…');
     try {
       const official = await resolveOfficial(picked, streetId ?? streetOptions[0]?.id);
-      if (!official) throw new Error('Адресу не знайдено в офіційному довіднику. Спробуйте пошук за вулицею.');
+      if (!official) throw new Error('Адресу не знайдено в офіційному довіднику. Спробуйте пошук за вулицею');
       const building = picked.building.trim();
       onSave({
         id: newId(),
@@ -176,9 +176,9 @@ export function PickAddressMap({
         lon: picked.lon,
       });
       dismissPicked();
-      notify.current('Адресу збережено.');
+      notify.current('Адресу збережено');
     } catch (error) {
-      notify.current(error instanceof Error ? error.message : 'Не вдалося зберегти адресу.');
+      notify.current(error instanceof Error ? error.message : 'Не вдалося зберегти адресу');
     } finally {
       setBusy(false);
     }
@@ -218,7 +218,7 @@ export function PickAddressMap({
         {!picked && hits.length === 0 && !noResults && (
           <div className="map-hint-dock" aria-hidden="true">Торкніться карти, щоб обрати будинок</div>
         )}
-        {noResults && !picked && hits.length === 0 && <div className="search-empty" role="status">Нічого не знайдено.</div>}
+        {noResults && !picked && hits.length === 0 && <div className="search-empty" role="status">Нічого не знайдено</div>}
         {hits.length > 0 && !picked && (
           <ul className="search-results">
             {hits.map(hit => (

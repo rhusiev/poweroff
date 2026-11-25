@@ -22,8 +22,8 @@ export function Settings({ theme, onTheme }: { theme: Theme; onTheme: (theme: Th
       <div className="card">
         <div className="label card-title">Про застосунок</div>
         <div className="caption">PowerOff Lviv</div>
-        <div className="caption">Джерело даних: Львівобленерго. Час оновлення надходить від оператора.</div>
-        <div className="caption">Карта й пошук адрес: OpenStreetMap та Nominatim. Запит надсилає координати або назву місця.</div>
+        <div className="caption">Джерело даних: Львівобленерго. Час оновлення надходить від оператора</div>
+        <div className="caption">Карта й пошук адрес: OpenStreetMap та Nominatim. Запит надсилає координати або назву місця</div>
       </div>
     </div>
   );

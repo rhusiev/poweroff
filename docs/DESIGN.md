@@ -172,7 +172,7 @@ event that does not name the building still shows as possible, with the reason
 
 - Add place: громада → місто → вулиця (search) → будинок → optional name.
   The steps are an ordered list. When the directory fails to load, a banner
-  says «Не вдалося завантажити довідник.» with a retry. On save, open the new
+  says «Не вдалося завантажити довідник» with a retry. On save, open the new
   address detail immediately. No confirm card and no «Відкрити» step. The
   mutation must update React state immediately. Both the directory and the map
   flow follow this rule.
@@ -180,8 +180,8 @@ event that does not name the building still shows as possible, with the reason
   also restores the compare selection. The delete toast wins over any notice
   already on screen; a new deletion clears the old notice.
 - Compare: user intent only; nothing is preselected and the selection never
-  resets on its own; 2–4 places. Below two the hint says «Оберіть 2–4 адреси.»;
-  at four it says «Обрано максимум: 4 адреси.», and a fifth pick shows a
+  resets on its own; 2–4 places. Below two the hint says «Оберіть 2–4 адреси»;
+  at four it says «Обрано максимум: 4 адреси», and a fifth pick shows a
   notice. Rows show name + group + strip, no repeated pills.
 - Groups: use the «Сьогодні» / «Завтра» tabs and a one-day timeline, not one
   long 48-hour stripe. A stale sync makes every group unknown.

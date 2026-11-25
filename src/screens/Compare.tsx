@@ -15,8 +15,8 @@ export function Compare({ snapshots, selected, minute, onToggle }: {
   const [day, setDay] = useState<0 | 1>(0);
   const chosen = snapshots.filter(snapshot => selected.includes(snapshot.address.id));
   const hint = selected.length < COMPARE_MIN
-    ? 'Оберіть 2–4 адреси.'
-    : selected.length >= COMPARE_MAX ? 'Обрано максимум: 4 адреси.' : '';
+    ? 'Оберіть 2–4 адреси'
+    : selected.length >= COMPARE_MAX ? 'Обрано максимум: 4 адреси' : '';
   return (
     <div className="compare-layout">
       <div className="compare-pick">

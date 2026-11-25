@@ -14,7 +14,7 @@ export function PlaceList({ snapshots, minute, onOpen, onAdd }: {
     return (
       <EmptyState
         title="Поки немає адрес"
-        text="Додайте першу адресу, щоб бачити статус світла."
+        text="Додайте першу адресу, щоб бачити статус світла"
         action={onAdd && <Button variant="primary" onClick={onAdd}>Додати адресу</Button>}
       />
     );

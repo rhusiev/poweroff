@@ -78,7 +78,7 @@ export function AddPlace({ onSave, onNotice }: {
       streetName: streetItem.name,
       buildingNumber: number,
     });
-    onNotice('Адресу збережено.');
+    onNotice('Адресу збережено');
   };
 
   return (
@@ -92,7 +92,7 @@ export function AddPlace({ onSave, onNotice }: {
           </div>
           {directory.failed && (
             <Banner action={<button type="button" className="btn" onClick={directory.retry}>Повторити спробу</button>}>
-              Не вдалося завантажити довідник.
+              Не вдалося завантажити довідник
             </Banner>
           )}
           {street ? (

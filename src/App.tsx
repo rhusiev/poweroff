@@ -139,7 +139,7 @@ const App = () => {
 
   const toggleCompare = (id: string) => {
     if (comparing.includes(id)) setCompareIds(comparing.filter(value => value !== id));
-    else if (comparing.length >= COMPARE_MAX) showNotice('Можна порівняти до 4 адрес.');
+    else if (comparing.length >= COMPARE_MAX) showNotice('Можна порівняти до 4 адрес');
     else setCompareIds([...comparing, id]);
   };
 
@@ -160,14 +160,14 @@ const App = () => {
         {view !== 'offline' && <button type="button" className="btn" onClick={() => go('offline')}>В офлайн</button>}
       </span>
     }>
-      Не вдалося отримати дані.
+      Не вдалося отримати дані
     </Banner>
   );
 
   const screens: Record<View, () => ReactNode> = {
     dashboard: () => (
       <>
-        {offline ? retryBanner : syncOld && <Banner>Дані застаріли (понад 48 год).</Banner>}
+        {offline ? retryBanner : syncOld && <Banner>Дані застаріли (понад 48 год)</Banner>}
         <PlaceList snapshots={cards} minute={clock.minute} onOpen={snapshot => openPlace(snapshot.address.id)} onAdd={openAdd} />
       </>
     ),
