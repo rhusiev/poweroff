@@ -1,6 +1,7 @@
 import { apiClient } from '../api/client';
 import type { Street } from '../api/types';
 import { matchesDirectoryName } from './directory';
+import { withTimeout } from './net';
 
 export interface GeocodeHit {
   lat: number;
@@ -107,7 +108,7 @@ function waitFor(ms: number, signal?: AbortSignal) {
 async function requestNominatim(url: string, signal?: AbortSignal): Promise<unknown> {
   await waitFor(Math.max(0, lastNominatimAt + NOMINATIM_SPACING_MS - Date.now()), signal);
   lastNominatimAt = Date.now();
-  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+  const response = await fetch(url, { signal: withTimeout(signal), headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`Nominatim responded ${response.status}`);
   return response.json();
 }

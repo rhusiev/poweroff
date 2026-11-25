@@ -1,5 +1,5 @@
 // Bump with every release: activate deletes the old cache, including earlier builds' hashed assets.
-const CACHE_NAME = 'poweroff-v9';
+const CACHE_NAME = 'poweroff-v10';
 
 const SHELL = [
   '/',

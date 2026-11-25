@@ -137,6 +137,18 @@ describe('stored place data', () => {
   });
 });
 
+describe('operator sync time', () => {
+  it('says the data failed, not that it is old, when no sync time was ever read', () => {
+    const [result] = buildPlaceSnapshots([address], { data: { a: place('3.1') }, failed: new Set() }, schedule({ '3.1': [] }), clock, null, now);
+    expect(result).toMatchObject({ status: 'gray', reason: 'Не вдалося отримати дані' });
+  });
+
+  it('says the data is old when the sync time is older than 48 hours', () => {
+    const [result] = buildPlaceSnapshots([address], { data: { a: place('3.1') }, failed: new Set() }, schedule({ '3.1': [] }), clock, '2026-11-20T10:00:00+02:00', now);
+    expect(result).toMatchObject({ status: 'gray', reason: 'Дані старші за 48 годин' });
+  });
+});
+
 describe('unknown parts of the day', () => {
   it('still shows a known emergency when the group is unknown', () => {
     const result = snapshot(place(undefined, [emergency('2026-11-25T10:00:00+02:00')]), schedule({ '3.1': [] }));

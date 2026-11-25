@@ -1,4 +1,5 @@
 import type { OTG, City, Street, Accident, PwAccount, GpvSchedule, SyncStatus } from './types';
+import { withTimeout } from '../lib/net';
 
 const BASE_URL = '/api-proxy';
 
@@ -20,7 +21,7 @@ async function fetchFromAPI<T>(
   const url = `${BASE_URL}${endpoint}${queryString ? `?${queryString}` : ''}`;
   const response = await fetch(url, {
     headers: { Accept: 'application/ld+json, application/json' },
-    signal,
+    signal: withTimeout(signal),
   });
   if (!response.ok) {
     console.error(`[API] ${endpoint} responded ${response.status}`);
@@ -150,7 +151,7 @@ export const apiClient = {
   },
 
   getGpvSchedule: async (): Promise<GpvSchedule> => {
-    const response = await fetch('/gpv');
+    const response = await fetch('/gpv', { signal: withTimeout() });
     if (!response.ok) throw new Error(`GPV schedule: ${response.status}`);
     return await response.json() as GpvSchedule;
   },

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient, type BuildingGroup } from '../api/client';
 import type { Accident, GpvDay, GpvSchedule, GpvWindow, SavedAddress } from '../api/types';
-import { DAY_MINUTES, formatWallMinute, minutesUntil, type KyivClock } from './kyivTime';
+import { DAY_MINUTES, formatWallMinute, minutesUntil, parseOperatorDate, type KyivClock } from './kyivTime';
 import { loadPlaceData, savePlaceData } from './storage';
 import {
   WINDOW_MINUTES,
@@ -179,6 +179,8 @@ interface Context {
   todayDay: GpvDay | null;
   tomorrowDay: GpvDay | null;
   syncOld: boolean;
+  /** No readable operator sync time arrived or was stored. */
+  syncMissing: boolean;
   clock: KyivClock;
   now: Date;
   id: string;
@@ -195,6 +197,7 @@ function snapshotReason(context: Context, fresh: boolean, todayGpv: GpvWindow[] 
   const failed = context.failed.has(context.id);
   if (!context.schedule || (!fresh && failed)) return 'Не вдалося отримати дані';
   if (!fresh) return 'Оновлюємо дані…';
+  if (context.syncMissing) return 'Не вдалося отримати дані';
   if (context.syncOld) return 'Дані старші за 48 годин';
   if (active?.source === 'accident') {
     if (active.status === 'yellow') return 'Можливе відключення · будинок не вказано в переліку події';
@@ -259,6 +262,7 @@ export function buildPlaceSnapshots(
     todayDay: scheduleDay(schedule, clock.todayKey),
     tomorrowDay: scheduleDay(schedule, clock.tomorrowKey),
     syncOld: isSyncOld(lastSync, now),
+    syncMissing: parseOperatorDate(lastSync) === null,
     clock,
     now,
   };

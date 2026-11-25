@@ -31,6 +31,8 @@ export function useOperatorData() {
   const [cached, setCached] = useState<DatedSchedule | null>(loadDatedSchedule);
   const [lastSync, setLastSync] = useState<string | null>(loadLastSync);
   const [failed, setFailed] = useState(false);
+  const lastSyncNow = useRef(lastSync);
+  useEffect(() => { lastSyncNow.current = lastSync; }, [lastSync]);
   const [refreshing, setRefreshing] = useState(false);
   const [online, setOnline] = useState(() => navigator.onLine);
   const [now, setNow] = useState(() => new Date());
@@ -50,12 +52,15 @@ export function useOperatorData() {
       saveSchedule(dated);
     }
     // A failed sync time keeps the stored one; its 48-hour limit still applies.
-    if (sync.status === 'fulfilled' && sync.value) {
-      setLastSync(sync.value);
-      saveLastSync(sync.value);
+    const readSync = sync.status === 'fulfilled' ? sync.value : null;
+    if (readSync) {
+      setLastSync(readSync);
+      saveLastSync(readSync);
     }
-    setFailed(!ok);
-    return ok;
+    // With no sync time at all, nothing can be shown as current: that is a failure too.
+    const done = ok && (readSync !== null || lastSyncNow.current !== null);
+    setFailed(!done);
+    return done;
   }, []);
 
   /** One fetch at a time; a call during a fetch waits for that fetch's result. */

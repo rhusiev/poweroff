@@ -68,6 +68,9 @@ Behavior of the LOE data that the code depends on, as seen on 2026-11-25:
 - `/pw_accounts` answers 429 to bursts of requests. The app refetches each
   place every 5 minutes
 
+Every request to LOE, `/gpv` and Nominatim gives up after 15 seconds and counts
+as failed, so one hung request cannot hold back later polls and retries.
+
 Map tiles come from OpenStreetMap, and address search uses Nominatim. The app
 sends at most one Nominatim request per 1.1 seconds and searches only on
 submit, as the Nominatim usage policy requires.
