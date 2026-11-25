@@ -1,4 +1,4 @@
-const CACHE_NAME = 'poweroff-v4'; 
+const CACHE_NAME = 'poweroff-v6';
 
 const ASSETS_TO_CACHE =[
   '/',
