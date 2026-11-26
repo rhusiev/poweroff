@@ -13,7 +13,8 @@ async function fetchFromAPI<T>(
   const query = new URLSearchParams();
   Object.keys(params).forEach(key => {
     const value = params[key];
-    if (Array.isArray(value)) value.forEach(item => query.append(key, String(item)));
+    // The API reads a filter with several values only as `key[]`; a repeated plain key keeps the last one.
+    if (Array.isArray(value)) value.forEach(item => query.append(`${key}[]`, String(item)));
     else query.append(key, String(value));
   });
   

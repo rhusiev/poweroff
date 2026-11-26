@@ -65,6 +65,7 @@ Behavior of the LOE data that the code depends on, as seen on 2026-11-25:
 - The meaning of the event codes `typeOff` and `switchSubReason` is not
   documented. `accidentStatus` in `src/lib/status.ts` holds the mapping in use,
   and an unknown code shows as «Немає даних»
+- A filter with several values, such as the name variants `111-Г` and `111Г`, must be sent as `buildingName[]=…&buildingName[]=…`. A repeated plain `buildingName` keeps only the last value
 - `/pw_accounts` answers 429 to bursts of requests. The app refetches each
   place every 5 minutes
 

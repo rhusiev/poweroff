@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeGroup, pickBuildingGroup } from './client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { apiClient, normalizeGroup, pickBuildingGroup } from './client';
 
 describe('building group', () => {
   it('keeps the official «Не входить» apart from a missing value', () => {
@@ -20,5 +20,21 @@ describe('building group', () => {
   it('takes the most common value, including «Не входить»', () => {
     expect(pickBuildingGroup([{ chergGpv: '1.1' }, { chergGpv: '1.1' }, { chergGpv: '2.1' }])).toBe('1.1');
     expect(pickBuildingGroup([{ chergGpv: 'Не входить' }, { chergGpv: null }])).toBeNull();
+  });
+});
+
+describe('building group request', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('sends every name variant as one array filter the API reads in full', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ 'hydra:member': [{ chergGpv: '4.1' }] })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.getBuildingGroup(693, 12445, '111-Г')).resolves.toBe('4.1');
+
+    const url = new URL(String((fetchMock.mock.calls[0] as unknown[])[0]), 'http://localhost');
+    // A repeated plain key would keep only its last value, «111Г», and match no account.
+    expect(url.searchParams.getAll('buildingName')).toEqual([]);
+    expect(url.searchParams.getAll('buildingName[]')).toEqual(['111-Г', '111Г']);
   });
 });
